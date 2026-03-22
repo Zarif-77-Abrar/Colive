@@ -1,1 +1,0 @@
-mongodb+srv://zarifabraransari_db_user:Wq7fwNBzhCyZ8v0L@cluster0.dlvmoqm.mongodb.net/?appName=Cluster0
