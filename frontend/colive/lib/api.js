@@ -65,6 +65,15 @@ export const compatibilityAPI = {
   getForRoom: (roomId) => request(`/compatibility/${roomId}`),
 };
 
+export const conversationAPI = {
+  getAll:     ()                      => request("/conversations"),
+  getById:    (id)                    => request(`/conversations/${id}`),
+  create:     (participants, roomId)  => request("/conversations", { method: "POST", body: JSON.stringify({participants, roomId}) }),
+  sendMessage: (conversationId, content) => request(`/conversations/${conversationId}/messages`, { method: "POST", body: JSON.stringify({content}) }),
+  markAsRead: (conversationId)        => request(`/conversations/${conversationId}/read`, { method: "PUT" }),
+  delete:     (conversationId)        => request(`/conversations/${conversationId}`, { method: "DELETE" }),
+};
+
 export const adminAPI = {
   getStats:       () => request("/admin/stats"),
   getUsers:       () => request("/admin/users"),

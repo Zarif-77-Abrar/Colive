@@ -4,15 +4,16 @@ import dotenv from "dotenv";
 import dns from "dns";
 import { connectDB } from "./config/db.js";
 
-import authRoutes          from "./routes/authRoutes.js";
-import adminRoutes         from "./routes/adminRoutes.js";
-import userRoutes          from "./routes/userRoutes.js";
-import propertyRoutes      from "./routes/propertyRoutes.js";
-import bookingRoutes       from "./routes/bookingRoutes.js";
-import paymentRoutes       from "./routes/paymentRoutes.js";
-import maintenanceRoutes   from "./routes/maintenanceRoutes.js";
-import noticeRoutes        from "./routes/noticeRoutes.js";
-import compatibilityRoutes from "./routes/compatibilityRoutes.js";
+import authRoutes           from "./routes/authRoutes.js";
+import adminRoutes          from "./routes/adminRoutes.js";
+import userRoutes           from "./routes/userRoutes.js";
+import propertyRoutes       from "./routes/propertyRoutes.js";
+import bookingRoutes        from "./routes/bookingRoutes.js";
+import paymentRoutes        from "./routes/paymentRoutes.js";
+import maintenanceRoutes    from "./routes/maintenanceRoutes.js";
+import noticeRoutes         from "./routes/noticeRoutes.js";
+import compatibilityRoutes  from "./routes/compatibilityRoutes.js";
+import conversationRoutes   from "./routes/conversationRoutes.js";
 
 dns.setServers(["1.1.1.1", "8.8.8.8"]);
 dotenv.config();
@@ -34,6 +35,7 @@ app.use("/api/payments",      paymentRoutes);
 app.use("/api/maintenance",   maintenanceRoutes);
 app.use("/api/notices",       noticeRoutes);
 app.use("/api/compatibility",  compatibilityRoutes);
+app.use("/api/conversations",  conversationRoutes);
 
 app.get("/api/health", (req, res) => res.json({ status: "CoLive API running" }));
 

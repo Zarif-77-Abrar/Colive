@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import Navbar from "../../../components/Navbar";
-import { getUser, propertyAPI, compatibilityAPI } from "../../../lib/api";
+import { getUser, propertyAPI, compatibilityAPI, conversationAPI } from "../../../lib/api";
 
 // ── Score ring component ───────────────────────────────────
 function ScoreRing({ score, size = 80, strokeWidth = 7 }) {
@@ -88,6 +88,7 @@ export default function RoomDetailPage() {
   const [loading,       setLoading]       = useState(true);
   const [error,         setError]         = useState("");
   const [activeTab,     setActiveTab]     = useState("overview");
+  const [messagingUser, setMessagingUser] = useState(null);
 
   useEffect(() => {
     const u = getUser();
@@ -144,6 +145,20 @@ export default function RoomDetailPage() {
       } catch {
         setCompatibility(null);
       }
+    }
+  };
+
+  const handleMessageFlatmate = async (flatmate) => {
+    try {
+      setMessagingUser(flatmate.id);
+      // Create or get conversation with this flatmate
+      const convData = await conversationAPI.create([user._id, flatmate.id], room._id);
+      // Navigate to messages page with this conversation
+      router.push(`/messages?conversationId=${convData.conversation._id}`);
+    } catch (err) {
+      console.error("Failed to start conversation:", err.message);
+      alert("Failed to start messaging. Please try again.");
+      setMessagingUser(null);
     }
   };
 
@@ -529,14 +544,14 @@ export default function RoomDetailPage() {
                           </table>
                         </div>
 
-                        {/* Message button placeholder */}
+                        {/* Message button */}
                         <button
                           className="btn btn-secondary btn-sm"
                           style={{ marginTop: "0.875rem" }}
-                          disabled
-                          title="Messaging coming soon"
+                          onClick={() => handleMessageFlatmate(flatmate)}
+                          disabled={messagingUser === flatmate.id}
                         >
-                          Message {flatmate.name.split(" ")[0]}
+                          {messagingUser === flatmate.id ? "Starting..." : `Message ${flatmate.name.split(" ")[0]}`}
                         </button>
                       </div>
                     ))}
