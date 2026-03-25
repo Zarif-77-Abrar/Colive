@@ -91,7 +91,13 @@ export default function RegisterPage() {
       });
 
       await authAPI.register(payload);
-      router.push("/login?registered=true");
+      // Tenants go to onboarding to set preferences
+      // Owners go straight to login
+      if (payload.role === "tenant") {
+        router.push("/login?next=onboarding");
+      } else {
+        router.push("/login?registered=true");
+      }
 
     } catch (err) {
       setApiError(err.message);
