@@ -6,7 +6,7 @@ import {
   sendMessage,
   markAsRead,
   createConversation,
-  deleteConversation,
+  // deleteConversation,
 } from "../controllers/conversationController.js";
 
 const router = express.Router();
@@ -36,6 +36,6 @@ router.put("/:id/read", markAsRead);
 
 // ── DELETE /api/conversations/:id ──────────────────────────
 // Delete (hide) a conversation
-router.delete("/:id", deleteConversation);
+// router.delete("/:id", deleteConversation);
 
 export default router;
