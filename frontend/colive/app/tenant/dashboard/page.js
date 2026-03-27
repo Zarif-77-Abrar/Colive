@@ -48,7 +48,24 @@ const EMPTY_FORM = { title: "", description: "", category: "other", priority: "m
 export default function TenantDashboard() {
   const router = useRouter();
   const [user, setUser]     = useState(null);
+  const [profile, setProfile] = useState(null);
   const [active, setActive] = useState("overview");
+
+  // Maintenance page state
+  const [mRequests, setMRequests] = useState([]);
+  const [mLoading, setMLoading] = useState(false);
+  const [mError, setMError] = useState("");
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState(EMPTY_FORM);
+  const [submitting, setSubmitting] = useState(false);
+  const [formError, setFormError] = useState("");
+  const [successMsg, setSuccessMsg] = useState("");
+
+  // Property search state for maintenance form
+  const [allProperties, setAllProperties] = useState([]);
+  const [propertySearch, setPropertySearch] = useState("");
+  const [selectedProperty, setSelectedProperty] = useState(null);
+  const [showSuggestions, setShowSuggestions] = useState(false);
 
   useEffect(() => {
     const u = getUser();
@@ -148,7 +165,7 @@ export default function TenantDashboard() {
 
   const pendingBookings  = bookings.data?.bookings?.filter(b => b.status === "pending").length  ?? 0;
   const paidThisMonth    = payments.data?.payments?.filter(p => p.paymentStatus === "paid" && new Date(p.paidAt).getMonth() === new Date().getMonth()).length ?? 0;
-  const openMaintenance  = maintenance.data?.requests?.filter(r => r.status !== "resolved").length ?? 0;
+  const openMaintenance  = mRequests.filter(r => r.status !== "resolved").length;
 
   return (
     <div style={{ minHeight: "100vh", background: "var(--color-neutral-50)" }}>
@@ -187,7 +204,7 @@ export default function TenantDashboard() {
             </div>
 
             {/* Compatibility tip if preferences empty */}
-            {!user.preferences?.sleepSchedule && (
+            {!(profile?.preferences?.sleepSchedule || user.preferences?.sleepSchedule) && (
               <div style={{
                 background: "var(--color-primary-50)", border: "1px solid var(--color-primary-200)",
                 borderRadius: "var(--radius-lg)", padding: "1.25rem 1.5rem",
