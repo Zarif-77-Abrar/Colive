@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import Navbar from "../../../components/Navbar";
 import TabBar from "../../../components/TabBar";
 import StatCard from "../../../components/StatCard";
@@ -16,6 +17,7 @@ const TABS = [
   { key: "bookings",    label: "Bookings"       },
   { key: "maintenance", label: "Maintenance"    },
   { key: "notices",     label: "Notices"        },
+  { key: "messages",    label: "Messages"       },
 ];
 
 const fmtDate  = (d) => d ? new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "—";
@@ -226,6 +228,23 @@ export default function OwnerDashboard() {
                 </div>
               )
             }
+          </div>
+        )}
+
+        {/* ── Messages ────────────────────────────────────── */}
+        {active === "messages" && (
+          <div>
+            <h3 style={{ marginBottom: "1.5rem" }}>Messages</h3>
+            <div className="card">
+              <div style={{ textAlign: "center", padding: "2rem" }}>
+                <p style={{ color: "var(--color-neutral-600)", marginBottom: "1rem" }}>
+                  View and manage your conversations with tenants.
+                </p>
+                <Link href="/messages" className="btn btn-primary">
+                  Go to messages
+                </Link>
+              </div>
+            </div>
           </div>
         )}
 
