@@ -71,7 +71,7 @@ export const conversationAPI = {
   create:     (participants, roomId)  => request("/conversations", { method: "POST", body: JSON.stringify({participants, roomId}) }),
   sendMessage: (conversationId, content) => request(`/conversations/${conversationId}/messages`, { method: "POST", body: JSON.stringify({content}) }),
   markAsRead: (conversationId)        => request(`/conversations/${conversationId}/read`, { method: "PUT" }),
-  delete:     (conversationId)        => request(`/conversations/${conversationId}`, { method: "DELETE" }),
+  // delete:     (conversationId)        => request(`/conversations/${conversationId}`, { method: "DELETE" }),
 };
 
 export const adminAPI = {
