@@ -4,13 +4,14 @@ import dotenv from "dotenv";
 import dns from "dns";
 import { connectDB } from "./config/db.js";
 
-import authRoutes        from "./routes/authRoutes.js";
-import adminRoutes       from "./routes/adminRoutes.js";
-import propertyRoutes    from "./routes/propertyRoutes.js";
-import bookingRoutes     from "./routes/bookingRoutes.js";
-import paymentRoutes     from "./routes/paymentRoutes.js";
+import authRoutes from "./routes/authRoutes.js";
+import adminRoutes from "./routes/adminRoutes.js";
+import propertyRoutes from "./routes/propertyRoutes.js";
+import bookingRoutes from "./routes/bookingRoutes.js";
+import paymentRoutes from "./routes/paymentRoutes.js";
 import maintenanceRoutes from "./routes/maintenanceRoutes.js";
-import noticeRoutes      from "./routes/noticeRoutes.js";
+import noticeRoutes from "./routes/noticeRoutes.js";
+import { stripeWebhook } from "./controllers/paymentController.js";
 
 dns.setServers(["1.1.1.1", "8.8.8.8"]);
 dotenv.config();
@@ -18,18 +19,26 @@ dotenv.config();
 const app = express();
 
 app.use(cors({ origin: "http://localhost:3000", credentials: true }));
+
+// Stripe webhook must come before express.json()
+app.post(
+  "/api/payments/webhook",
+  express.raw({ type: "application/json" }),
+  stripeWebhook
+);
+
 app.use(express.json());
 
 connectDB();
 
 // ── Routes ─────────────────────────────────────────────────
-app.use("/api/auth",        authRoutes);
-app.use("/api/admin",       adminRoutes);
-app.use("/api/properties",  propertyRoutes);
-app.use("/api/bookings",    bookingRoutes);
-app.use("/api/payments",    paymentRoutes);
+app.use("/api/auth", authRoutes);
+app.use("/api/admin", adminRoutes);
+app.use("/api/properties", propertyRoutes);
+app.use("/api/bookings", bookingRoutes);
+app.use("/api/payments", paymentRoutes);
 app.use("/api/maintenance", maintenanceRoutes);
-app.use("/api/notices",     noticeRoutes);
+app.use("/api/notices", noticeRoutes);
 
 // Health check
 app.get("/api/health", (req, res) => res.json({ status: "CoLive API running" }));
