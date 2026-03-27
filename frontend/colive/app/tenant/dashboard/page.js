@@ -45,6 +45,34 @@ const Badge = ({ meta }) => (
 
 const EMPTY_FORM = { title: "", description: "", category: "other", priority: "medium", propertyId: "", roomId: "" };
 
+const labelStyle = {
+  display: "block",
+  marginBottom: "0.375rem",
+  fontSize: "0.8125rem",
+  fontWeight: "600",
+  color: "#374151",
+};
+
+const inputStyle = {
+  width: "100%",
+  border: "1px solid #d1d5db",
+  borderRadius: "8px",
+  padding: "0.625rem 0.75rem",
+  fontSize: "0.875rem",
+  color: "#111827",
+  background: "#ffffff",
+  outline: "none",
+};
+
+const btnStyle = {
+  border: "none",
+  borderRadius: "8px",
+  padding: "0.625rem 1.25rem",
+  fontWeight: "600",
+  fontSize: "0.875rem",
+  cursor: "pointer",
+};
+
 export default function TenantDashboard() {
   const router = useRouter();
   const [user, setUser]     = useState(null);
