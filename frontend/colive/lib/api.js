@@ -53,8 +53,25 @@ export const paymentAPI = {
 
 // ── Maintenance ────────────────────────────────────────────
 export const maintenanceAPI = {
-  getMy:       () => request("/maintenance/my"),
-  getProperty: () => request("/maintenance/property"),
+  // Tenant
+  getMy:          ()           => request("/maintenance/my"),
+  create:         (body)       => request("/maintenance", { method: "POST", body: JSON.stringify(body) }),
+
+  // Owner
+  getProperty:    ()           => request("/maintenance/property"),
+
+  // Admin
+  getAll:         ()           => request("/maintenance/all"),
+
+  // Owner + Admin
+  updateStatus:   (id, status) => request(`/maintenance/${id}/status`, {
+    method: "PATCH",
+    body: JSON.stringify({ status }),
+  }),
+  assignTechnician: (id, technicianName) => request(`/maintenance/${id}/assign`, {
+    method: "PATCH",
+    body: JSON.stringify({ technicianName }),
+  }),
 };
 
 // ── Notices ────────────────────────────────────────────────
