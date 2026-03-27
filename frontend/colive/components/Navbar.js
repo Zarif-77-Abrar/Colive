@@ -15,11 +15,7 @@ export default function Navbar() {
     setUser(u);
   }, [router]);
 
-  const roleLabel = {
-    tenant: "Tenant",
-    owner:  "Owner",
-    admin:  "Admin",
-  };
+  const roleLabel = { tenant: "Tenant", owner: "Owner", admin: "Admin" };
 
   const roleColor = {
     tenant: { bg: "var(--color-primary-50)",  color: "var(--color-primary-700)"  },
@@ -30,6 +26,13 @@ export default function Navbar() {
   if (!user) return null;
 
   const rc = roleColor[user.role] || roleColor.tenant;
+
+  // Dashboard link based on role
+  const dashboardHref = {
+    tenant: "/tenant/dashboard",
+    owner:  "/owner/dashboard",
+    admin:  "/admin/dashboard",
+  }[user.role] || "/";
 
   return (
     <nav style={{
@@ -44,8 +47,9 @@ export default function Navbar() {
       top: 0,
       zIndex: 100,
     }}>
+
       {/* Brand */}
-      <Link href="/" style={{
+      <Link href={dashboardHref} style={{
         fontSize: "1.25rem",
         fontWeight: "700",
         color: "var(--color-primary-500)",
@@ -69,21 +73,31 @@ export default function Navbar() {
           {roleLabel[user.role]}
         </span>
 
-        {/* User name */}
-        <span style={{
-          fontSize: "0.875rem",
-          fontWeight: "500",
-          color: "var(--color-neutral-700)",
-        }}>
-          {user.name}
-        </span>
+        {/* Username — links to profile for tenants and owners, not admins */}
+        {user.role !== "admin" ? (
+          <Link href="/profile" style={{
+            fontSize: "0.875rem",
+            fontWeight: "500",
+            color: "var(--color-neutral-700)",
+            textDecoration: "none",
+            borderBottom: "1px dashed var(--color-neutral-300)",
+            paddingBottom: "1px",
+          }}>
+            {user.name}
+          </Link>
+        ) : (
+          <span style={{
+            fontSize: "0.875rem",
+            fontWeight: "500",
+            color: "var(--color-neutral-700)",
+          }}>
+            {user.name}
+          </span>
+        )}
 
-        {/* Logout */}
-        <button
-          onClick={logout}
-          className="btn btn-ghost btn-sm"
-          style={{ fontSize: "0.8125rem" }}
-        >
+        {/* Sign out */}
+        <button onClick={logout} className="btn btn-ghost btn-sm"
+          style={{ fontSize: "0.8125rem" }}>
           Sign out
         </button>
       </div>

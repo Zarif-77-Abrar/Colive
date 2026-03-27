@@ -1,6 +1,5 @@
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL;
 
-// ── Core fetch wrapper ─────────────────────────────────────
 const request = async (endpoint, options = {}) => {
   const token = typeof window !== "undefined"
     ? localStorage.getItem("token")
@@ -25,44 +24,56 @@ const request = async (endpoint, options = {}) => {
   return data;
 };
 
-// ── Auth ───────────────────────────────────────────────────
 export const authAPI = {
   register: (body) => request("/auth/register", { method: "POST", body: JSON.stringify(body) }),
   login:    (body) => request("/auth/login",    { method: "POST", body: JSON.stringify(body) }),
   getMe:    ()     => request("/auth/me"),
 };
 
-// ── Properties ─────────────────────────────────────────────
+export const userAPI = {
+  getProfile:        ()     => request("/users/profile"),
+  updateProfile:     (body) => request("/users/profile",     { method: "PUT", body: JSON.stringify(body) }),
+  updatePreferences: (body) => request("/users/preferences", { method: "PUT", body: JSON.stringify(body) }),
+};
+
 export const propertyAPI = {
   getAll:  (query = "") => request(`/properties${query}`),
   getById: (id)         => request(`/properties/${id}`),
   getMy:   ()           => request("/properties/my"),
 };
 
-// ── Bookings ───────────────────────────────────────────────
 export const bookingAPI = {
   getMy:       () => request("/bookings/my"),
   getReceived: () => request("/bookings/received"),
 };
 
-// ── Payments ───────────────────────────────────────────────
 export const paymentAPI = {
   getMy:       () => request("/payments/my"),
   getProperty: () => request("/payments/property"),
 };
 
-// ── Maintenance ────────────────────────────────────────────
 export const maintenanceAPI = {
   getMy:       () => request("/maintenance/my"),
   getProperty: () => request("/maintenance/property"),
 };
 
-// ── Notices ────────────────────────────────────────────────
 export const noticeAPI = {
   getMy: () => request("/notices/my"),
 };
 
-// ── Admin ──────────────────────────────────────────────────
+export const compatibilityAPI = {
+  getForRoom: (roomId) => request(`/compatibility/${roomId}`),
+};
+
+export const conversationAPI = {
+  getAll:     ()                      => request("/conversations"),
+  getById:    (id)                    => request(`/conversations/${id}`),
+  create:     (participants, roomId)  => request("/conversations", { method: "POST", body: JSON.stringify({participants, roomId}) }),
+  sendMessage: (conversationId, content) => request(`/conversations/${conversationId}/messages`, { method: "POST", body: JSON.stringify({content}) }),
+  markAsRead: (conversationId)        => request(`/conversations/${conversationId}/read`, { method: "PUT" }),
+  // delete:     (conversationId)        => request(`/conversations/${conversationId}`, { method: "DELETE" }),
+};
+
 export const adminAPI = {
   getStats:       () => request("/admin/stats"),
   getUsers:       () => request("/admin/users"),
@@ -73,7 +84,6 @@ export const adminAPI = {
   createAdmin:    (body) => request("/admin/create-admin", { method: "POST", body: JSON.stringify(body) }),
 };
 
-// ── Token helpers ──────────────────────────────────────────
 export const saveToken   = (token) => localStorage.setItem("token", token);
 export const getToken    = ()      => localStorage.getItem("token");
 export const removeToken = ()      => localStorage.removeItem("token");
