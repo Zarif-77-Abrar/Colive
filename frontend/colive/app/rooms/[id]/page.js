@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import Navbar from "../../../components/Navbar";
-import { getUser, propertyAPI, compatibilityAPI, conversationAPI } from "../../../lib/api";
+import { getUser, propertyAPI, compatibilityAPI, conversationAPI, bookingAPI } from "../../../lib/api";
 
 // ── Score ring component ───────────────────────────────────
 function ScoreRing({ score, size = 80, strokeWidth = 7 }) {
@@ -89,6 +89,8 @@ export default function RoomDetailPage() {
   const [error,         setError]         = useState("");
   const [activeTab,     setActiveTab]     = useState("overview");
   const [messagingUser, setMessagingUser] = useState(null);
+  const [booking,     setBooking]     = useState(false);
+  const [bookingMsg,  setBookingMsg]  = useState({ text: "", type: "" });
 
   useEffect(() => {
     const u = getUser();
@@ -159,6 +161,25 @@ export default function RoomDetailPage() {
       console.error("Failed to start conversation:", err.message);
       alert("Failed to start messaging. Please try again.");
       setMessagingUser(null);
+    }
+  };
+
+  const handleBooking = async () => {
+    if (!room || !property) return;
+    setBooking(true);
+    setBookingMsg({ text: "", type: "" });
+    try {
+      await bookingAPI.create({
+        roomId:             room._id,
+        propertyId:         property._id,
+        ownerId:            property.ownerId?._id,
+        compatibilityScore: compatibility?.averageScore ?? null,
+      });
+      setBookingMsg({ text: "Booking request sent! The owner will review it shortly.", type: "success" });
+    } catch (err) {
+      setBookingMsg({ text: err.message, type: "error" });
+    } finally {
+      setBooking(false);
     }
   };
 
@@ -414,16 +435,33 @@ export default function RoomDetailPage() {
                 )}
 
                 {/* Book button */}
-                {user?.role === "tenant" && room.status === "available" && (
-                  <button className="btn btn-primary" style={{ width: "100%" }}>
-                    Request to book this room
-                  </button>
-                )}
-                {room.status !== "available" && (
-                  <button className="btn btn-ghost" disabled style={{ width: "100%", opacity: 0.5 }}>
-                    This room is currently {room.status}
-                  </button>
-                )}
+                
+                {bookingMsg.text && (
+                <div style={{
+                  padding: "0.75rem 1rem", borderRadius: "var(--radius-md)",
+                  marginBottom: "1rem", fontSize: "0.875rem",
+                  background: bookingMsg.type === "success" ? "var(--color-success-50)" : "var(--color-error-50)",
+                  border: `1px solid ${bookingMsg.type === "success" ? "var(--color-success-500)" : "var(--color-error-500)"}`,
+                  color: bookingMsg.type === "success" ? "var(--color-success-700)" : "var(--color-error-700)",
+                }}>
+                  {bookingMsg.text}
+                </div>
+              )}
+              {user?.role === "tenant" && room.status === "available" && (
+                <button
+                  className="btn btn-primary"
+                  style={{ width: "100%" }}
+                  onClick={handleBooking}
+                  disabled={booking}
+                >
+                  {booking ? "Sending request..." : "Request to book this room"}
+                </button>
+              )}
+              {room.status !== "available" && (
+                <button className="btn btn-ghost" disabled style={{ width: "100%", opacity: 0.5 }}>
+                  This room is currently {room.status}
+                </button>
+              )}
               </div>
             )}
 
