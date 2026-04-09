@@ -45,6 +45,9 @@ export const propertyAPI = {
 export const bookingAPI = {
   getMy:       () => request("/bookings/my"),
   getReceived: () => request("/bookings/received"),
+  create:      (body) => request("/bookings", { method: "POST", body: JSON.stringify(body) }),
+  accept:      (id)  => request(`/bookings/${id}/accept`, { method: "PUT" }),
+  reject:      (id)  => request(`/bookings/${id}/reject`, { method: "PUT" }),
 };
 
 export const paymentAPI = {

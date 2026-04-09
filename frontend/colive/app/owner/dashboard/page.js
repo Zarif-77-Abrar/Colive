@@ -27,6 +27,8 @@ export default function OwnerDashboard() {
   const router = useRouter();
   const [user, setUser]     = useState(null);
   const [active, setActive] = useState("overview");
+  const [actionLoading, setActionLoading] = useState(null);
+  const [actionMsg,     setActionMsg]     = useState("");  
 
   useEffect(() => {
     const u = getUser();
@@ -34,6 +36,21 @@ export default function OwnerDashboard() {
     if (u.role !== "owner") { router.push("/login"); return; }
     setUser(u);
   }, [router]);
+
+  const handleBookingAction = async (bookingId, action) => {
+    setActionLoading(bookingId + action);
+    setActionMsg("");
+    try {
+      await bookingAPI[action === "accept" ? "accept" : "reject"](bookingId);
+      setActionMsg(`Booking ${action}ed successfully.`);
+      // bookings.refetch?.();
+      setTimeout(() => window.location.reload(), 1000);
+    } catch (err) {
+      setActionMsg(err.message);
+    } finally {
+      setActionLoading(null);
+    }
+  };  
 
   const properties  = useApi(propertyAPI.getMy);
   const bookings    = useApi(bookingAPI.getReceived);
@@ -158,7 +175,7 @@ export default function OwnerDashboard() {
           <div>
             <h3 style={{ marginBottom: "1.5rem" }}>All booking requests</h3>
             <div className="card">
-              {bookings.loading ? <LoadingSpinner /> : bookings.error ? <ErrorState message={bookings.error} /> : (
+              {/* {bookings.loading ? <LoadingSpinner /> : bookings.error ? <ErrorState message={bookings.error} /> : (
                 <DataTable
                   headers={["Tenant", "Property", "Room", "Rent", "Compatibility", "Status", "Date"]}
                   emptyMessage="No booking requests received yet."
@@ -172,7 +189,78 @@ export default function OwnerDashboard() {
                     fmtDate(b.createdAt),
                   ])}
                 />
+              )} */}
+              {actionMsg && (
+                <div style={{
+                  padding: "0.75rem 1rem", borderRadius: "var(--radius-md)",
+                  marginBottom: "1rem", fontSize: "0.875rem",
+                  background: "var(--color-success-50)",
+                  border: "1px solid var(--color-success-500)",
+                  color: "var(--color-success-700)",
+                }}>
+                  {actionMsg}
+                </div>
               )}
+              {bookings.loading ? <LoadingSpinner /> : bookings.error ? <ErrorState message={bookings.error} /> : (
+                <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+                  {bookings.data?.bookings?.length === 0 && (
+                    <p style={{ color: "var(--color-neutral-400)", fontSize: "0.875rem" }}>No booking requests received yet.</p>
+                  )}
+                  {(bookings.data?.bookings ?? []).map((b) => (
+                    <div key={b._id} style={{
+                      padding: "1rem", borderRadius: "var(--radius-md)",
+                      border: "1px solid var(--color-neutral-200)",
+                      display: "flex", justifyContent: "space-between",
+                      alignItems: "center", flexWrap: "wrap", gap: "1rem",
+                    }}>
+                      <div>
+                        <p style={{ fontWeight: "600", marginBottom: "0.25rem" }}>
+                          {b.tenantId?.name ?? "—"} → {b.propertyId?.title ?? "—"}, {b.roomId?.label ?? "—"}
+                        </p>
+                        <p style={{ fontSize: "0.8125rem", color: "var(--color-neutral-500)" }}>
+                          {fmtMoney(b.roomId?.rent)}/mo
+                          {b.compatibilityScore != null ? ` · ${b.compatibilityScore}% compatibility` : ""}
+                          {" · "}{fmtDate(b.createdAt)}
+                        </p>
+                        {b.message && (
+                          <p style={{ fontSize: "0.8125rem", color: "var(--color-neutral-600)", marginTop: "0.25rem" }}>
+                            &ldquo;{b.message}&rdquo;
+                          </p>
+                        )}
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.625rem" }}>
+                        {b.status === "pending" ? (
+                          <>
+                            <button
+                              className="btn btn-primary btn-sm"
+                              disabled={!!actionLoading}
+                              onClick={() => handleBookingAction(b._id, "accept")}
+                            >
+                              {actionLoading === b._id + "accept" ? "..." : "Accept"}
+                            </button>
+                            <button
+                              className="btn btn-danger btn-sm"
+                              disabled={!!actionLoading}
+                              onClick={() => handleBookingAction(b._id, "reject")}
+                            >
+                              {actionLoading === b._id + "reject" ? "..." : "Decline"}
+                            </button>
+                          </>
+                        ) : (
+                          <span style={{
+                            fontSize: "0.75rem", fontWeight: "500",
+                            padding: "0.2rem 0.625rem", borderRadius: "9999px",
+                            background: b.status === "accepted" ? "var(--color-success-50)" : "var(--color-error-50)",
+                            color: b.status === "accepted" ? "var(--color-success-700)" : "var(--color-error-700)",
+                          }}>
+                            {b.status}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}                
             </div>
           </div>
         )}
