@@ -31,9 +31,11 @@ export const authAPI = {
 };
 
 export const userAPI = {
-  getProfile:        ()     => request("/users/profile"),
-  updateProfile:     (body) => request("/users/profile",     { method: "PUT", body: JSON.stringify(body) }),
-  updatePreferences: (body) => request("/users/preferences", { method: "PUT", body: JSON.stringify(body) }),
+  getProfile:        ()      => request("/users/profile"),
+  updateProfile:     (body)  => request("/users/profile",     { method: "PUT",    body: JSON.stringify(body) }),
+  updatePreferences: (body)  => request("/users/preferences", { method: "PUT",    body: JSON.stringify(body) }),
+  saveFcmToken:      (token) => request("/users/fcm-token",   { method: "POST",   body: JSON.stringify({ token }) }),
+  removeFcmToken:    (token) => request("/users/fcm-token",   { method: "DELETE", body: JSON.stringify({ token }) }),
 };
 
 export const propertyAPI = {
@@ -43,9 +45,9 @@ export const propertyAPI = {
 };
 
 export const bookingAPI = {
-  getMy:       () => request("/bookings/my"),
-  getReceived: () => request("/bookings/received"),
-  create:      (body) => request("/bookings", { method: "POST", body: JSON.stringify(body) }),
+  getMy:       ()    => request("/bookings/my"),
+  getReceived: ()    => request("/bookings/received"),
+  create:      (body)=> request("/bookings",           { method: "POST", body: JSON.stringify(body) }),
   accept:      (id)  => request(`/bookings/${id}/accept`, { method: "PUT" }),
   reject:      (id)  => request(`/bookings/${id}/reject`, { method: "PUT" }),
 };
@@ -69,12 +71,11 @@ export const compatibilityAPI = {
 };
 
 export const conversationAPI = {
-  getAll:     ()                      => request("/conversations"),
-  getById:    (id)                    => request(`/conversations/${id}`),
-  create:     (participants, roomId)  => request("/conversations", { method: "POST", body: JSON.stringify({participants, roomId}) }),
-  sendMessage: (conversationId, content) => request(`/conversations/${conversationId}/messages`, { method: "POST", body: JSON.stringify({content}) }),
-  markAsRead: (conversationId)        => request(`/conversations/${conversationId}/read`, { method: "PUT" }),
-  // delete:     (conversationId)        => request(`/conversations/${conversationId}`, { method: "DELETE" }),
+  getAll:      ()                         => request("/conversations"),
+  getById:     (id)                       => request(`/conversations/${id}`),
+  create:      (participants, relatedRoomId) => request("/conversations", { method: "POST", body: JSON.stringify({ participants, relatedRoomId }) }),
+  sendMessage: (conversationId, content)  => request(`/conversations/${conversationId}/messages`, { method: "POST", body: JSON.stringify({ content }) }),
+  markAsRead:  (conversationId)           => request(`/conversations/${conversationId}/read`, { method: "PUT" }),
 };
 
 export const adminAPI = {
