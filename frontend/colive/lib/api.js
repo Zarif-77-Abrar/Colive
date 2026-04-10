@@ -74,6 +74,26 @@ export const maintenanceAPI = {
   }),
 };
 
+// ── Guest Log ────────────────────────────────────────────
+
+export const guestLogAPI = {
+  // Tenant
+  getMy:    ()     => request("/guests/my"),
+  create:   (body) => request("/guests", { method: "POST", body: JSON.stringify(body) }),
+ 
+  // Owner
+  getProperty: () => request("/guests/property"),
+ 
+  // Admin
+  getAll:   ()     => request("/guests/all"),
+ 
+  // Owner + Admin
+  updateStatus: (id, status) => request(`/guests/${id}/status`, {
+    method: "PATCH",
+    body: JSON.stringify({ status }),
+  }),
+};
+
 // ── Notices ────────────────────────────────────────────────
 export const noticeAPI = {
   getMy: () => request("/notices/my"),

@@ -10,6 +10,7 @@ import propertyRoutes    from "./routes/propertyRoutes.js";
 import bookingRoutes     from "./routes/bookingRoutes.js";
 import paymentRoutes     from "./routes/paymentRoutes.js";
 import maintenanceRoutes from "./routes/maintenanceRoutes.js";
+import guestLogRoutes    from "./routes/guestLogRoutes.js";
 import noticeRoutes      from "./routes/noticeRoutes.js";
 
 dns.setServers(["1.1.1.1", "8.8.8.8"]);
@@ -29,6 +30,7 @@ app.use("/api/properties",  propertyRoutes);
 app.use("/api/bookings",    bookingRoutes);
 app.use("/api/payments",    paymentRoutes);
 app.use("/api/maintenance", maintenanceRoutes);
+app.use("/api/guests",      guestLogRoutes);
 app.use("/api/notices",     noticeRoutes);
 
 // Health check
