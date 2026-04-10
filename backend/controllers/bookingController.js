@@ -133,7 +133,7 @@ export const acceptBooking = async (req, res) => {
       console.error("Failed to create conversation:", convErr.message);
     }
 
-    await booking.populate("roomId").populate("tenantId").populate("ownerId");
+    await booking.populate(["roomId", "tenantId", "ownerId"]);
 
     return res.status(200).json({
       booking,
@@ -163,7 +163,7 @@ export const rejectBooking = async (req, res) => {
     booking.resolvedAt = new Date();
     await booking.save();
 
-    await booking.populate("roomId").populate("tenantId").populate("ownerId");
+    await booking.populate(["roomId", "tenantId", "ownerId"]);
 
     return res.status(200).json({ booking, message: "Booking rejected." });
   } catch (err) {
