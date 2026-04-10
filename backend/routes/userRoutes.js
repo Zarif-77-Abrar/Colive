@@ -5,6 +5,8 @@ import {
   getProfile,
   updateProfile,
   updatePreferences,
+  saveFcmToken,
+  removeFcmToken,
 } from "../controllers/userController.js";
 
 const router = express.Router();
@@ -20,31 +22,31 @@ const profileValidation = [
 
 const preferencesValidation = [
   body("sleepSchedule").notEmpty()
-    .isIn(["early_bird", "night_owl", "flexible"]).withMessage("Invalid sleep schedule."),
+    .isIn(["early_bird", "night_owl", "flexible"]),
   body("smoking").notEmpty()
-    .isIn(["smoker", "non_smoker", "outdoor_only"]).withMessage("Invalid smoking preference."),
+    .isIn(["smoker", "non_smoker", "outdoor_only"]),
   body("drinking").notEmpty()
-    .isIn(["yes", "no", "occasionally"]).withMessage("Invalid drinking preference."),
+    .isIn(["yes", "no", "occasionally"]),
   body("noiseTolerance").notEmpty()
-    .isIn(["quiet", "moderate", "loud"]).withMessage("Invalid noise tolerance."),
+    .isIn(["quiet", "moderate", "loud"]),
   body("guestPolicy").notEmpty()
-    .isIn(["no_guests", "occasionally", "frequently"]).withMessage("Invalid guest policy."),
+    .isIn(["no_guests", "occasionally", "frequently"]),
   body("cleanliness").notEmpty()
-    .isIn(["very_clean", "moderate", "relaxed"]).withMessage("Invalid cleanliness level."),
+    .isIn(["very_clean", "moderate", "relaxed"]),
   body("studyHabits").notEmpty()
-    .isIn(["home_studier", "library", "mixed"]).withMessage("Invalid study habits."),
+    .isIn(["home_studier", "library", "mixed"]),
   body("dietaryHabit").notEmpty()
-    .isIn(["vegetarian", "non_vegetarian", "vegan"]).withMessage("Invalid dietary habit."),
+    .isIn(["vegetarian", "non_vegetarian", "vegan"]),
   body("genderPreference").notEmpty()
-    .isIn(["same_gender_only", "any"]).withMessage("Invalid gender preference."),
-  body("budgetRange.min").notEmpty()
-    .isNumeric().withMessage("Minimum budget must be a number."),
-  body("budgetRange.max").notEmpty()
-    .isNumeric().withMessage("Maximum budget must be a number."),
+    .isIn(["same_gender_only", "any"]),
+  body("budgetRange.min").notEmpty().isNumeric(),
+  body("budgetRange.max").notEmpty().isNumeric(),
 ];
 
 router.get("/profile",         auth, getProfile);
 router.put("/profile",         auth, profileValidation,     updateProfile);
 router.put("/preferences",     auth, preferencesValidation, updatePreferences);
+router.post("/fcm-token",      auth, saveFcmToken);
+router.delete("/fcm-token",    auth, removeFcmToken);
 
 export default router;
