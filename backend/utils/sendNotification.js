@@ -1,5 +1,6 @@
 import admin from "firebase-admin";
 import { readFileSync } from "fs";
+import 'dotenv/config';
 
 // ── Initialize Firebase Admin ──────────────────────────────
 // Set FIREBASE_SERVICE_ACCOUNT_PATH in your .env
@@ -14,6 +15,7 @@ const initAdmin = () => {
     initialized = true;
     return;
   }
+
 
   const path = process.env.FIREBASE_SERVICE_ACCOUNT_PATH;
   if (!path) {

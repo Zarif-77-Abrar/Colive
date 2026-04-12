@@ -88,10 +88,42 @@ export const adminAPI = {
   createAdmin:    (body) => request("/admin/create-admin", { method: "POST", body: JSON.stringify(body) }),
 };
 
+// export const logout = async () => {
+//   const fcmToken = localStorage.getItem("fcmToken");
+//   if (fcmToken) {
+//     try {
+//       await userAPI.removeFcmToken(fcmToken);
+//     } catch (_) {}
+//     localStorage.removeItem("fcmToken");
+//   }
+//   removeToken();
+//   removeUser();
+//   window.location.href = "/login";
+// };
+
+
+export const logout = () => {
+  const fcmToken = localStorage.getItem("fcmToken");
+
+  // Clear everything immediately so the next user
+  // gets a clean slate regardless of API call outcome
+  removeToken();
+  removeUser();
+  localStorage.removeItem("fcmToken");
+  localStorage.removeItem("fcmTokenUserId");
+
+  // Remove FCM token from backend in the background
+  if (fcmToken) {
+    userAPI.removeFcmToken(fcmToken).catch(() => {});
+  }
+
+  window.location.href = "/login";
+};
+
 export const saveToken   = (token) => localStorage.setItem("token", token);
 export const getToken    = ()      => localStorage.getItem("token");
 export const removeToken = ()      => localStorage.removeItem("token");
 export const saveUser    = (user)  => localStorage.setItem("user", JSON.stringify(user));
 export const getUser     = ()      => { const u = localStorage.getItem("user"); return u ? JSON.parse(u) : null; };
 export const removeUser  = ()      => localStorage.removeItem("user");
-export const logout      = ()      => { removeToken(); removeUser(); window.location.href = "/login"; };
+// export const logout      = ()      => { removeToken(); removeUser(); window.location.href = "/login"; };

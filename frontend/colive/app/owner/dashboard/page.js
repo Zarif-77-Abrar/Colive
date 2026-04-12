@@ -10,6 +10,7 @@ import DataTable from "../../../components/DataTable";
 import { LoadingSpinner, ErrorState } from "../../../components/LoadingState";
 import useApi from "../../../lib/useApi";
 import { getUser, propertyAPI, bookingAPI, maintenanceAPI, noticeAPI } from "../../../lib/api";
+import useFCM from "../../../lib/useFCM";
 
 const TABS = [
   { key: "overview",    label: "Overview"      },
@@ -29,6 +30,8 @@ export default function OwnerDashboard() {
   const [active, setActive] = useState("overview");
   const [actionLoading, setActionLoading] = useState(null);
   const [actionMsg,     setActionMsg]     = useState("");  
+
+  // useFCM();
 
   useEffect(() => {
     const u = getUser();

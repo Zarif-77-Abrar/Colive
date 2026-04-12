@@ -9,6 +9,7 @@ import StatCard from "../../../components/StatCard";
 import DataTable from "../../../components/DataTable";
 import { LoadingSpinner, ErrorState } from "../../../components/LoadingState";
 import useApi from "../../../lib/useApi";
+import useFCM from "../../../lib/useFCM";
 import { getUser, bookingAPI, paymentAPI, maintenanceAPI, userAPI } from "../../../lib/api";
 
 const TABS = [
@@ -27,6 +28,8 @@ export default function TenantDashboard() {
   const [user,    setUser]    = useState(null);
   const [profile, setProfile] = useState(null);
   const [active,  setActive]  = useState("overview");
+
+  // useFCM();
 
   useEffect(() => {
     const u = getUser();

@@ -85,6 +85,12 @@ export default function MessagesPage() {
 
     const startPolling = async () => {
       pollingRef.current = setInterval(async () => {
+        // Stop polling if token is gone (user logged out)
+        const token = localStorage.getItem("token");
+        if (!token) {
+          clearInterval(pollingRef.current);
+          return;
+        }
         try {
           const data = await conversationAPI.getById(selectedConversationId);
           setMessages(data.messages || []);
