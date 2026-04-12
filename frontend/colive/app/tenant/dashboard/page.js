@@ -22,13 +22,9 @@ const TABS = [
   { key: "maintenance", label: "Maintenance" },
 ];
 
-// CURRENT TEST PAIR
-const TEST_ROOM_ID = "69c36b3e81806780abcf3eb2";
+// change these test IDs when needed
+const TEST_ROOM_ID = "69c36b3e81806780abcf3eb1";
 const TEST_PROPERTY_ID = "69c36b3e81806780abcf3eaa";
-
-// FOR NEXT TEST, you can switch to:
-// const TEST_ROOM_ID = "69c36b3e81806780abcf3eb1";
-// const TEST_PROPERTY_ID = "69c36b3e81806780abcf3eaa";
 
 const fmtDate = (d) =>
   d
@@ -49,6 +45,8 @@ export default function TenantDashboard() {
   const [user, setUser] = useState(null);
   const [active, setActive] = useState("overview");
   const [paying, setPaying] = useState(false);
+  const [monthFilter, setMonthFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
 
   useEffect(() => {
     const u = getUser();
@@ -64,7 +62,17 @@ export default function TenantDashboard() {
   }, [router]);
 
   const bookings = useApi(bookingAPI.getMy);
-  const payments = useApi(paymentAPI.getMy);
+
+  const payments = useApi(
+    () =>
+      paymentAPI.getMy(
+        `?month=${encodeURIComponent(monthFilter)}&status=${encodeURIComponent(
+          statusFilter
+        )}`
+      ),
+    [monthFilter, statusFilter]
+  );
+
   const maintenance = useApi(maintenanceAPI.getMy);
 
   const currentMonth = useMemo(() => {
@@ -74,8 +82,9 @@ export default function TenantDashboard() {
 
   const paymentQueryStatus = searchParams.get("payment");
 
+  const paymentList = payments.data?.payments ?? [];
+
   const alreadyPaidForTestRoom = useMemo(() => {
-    const paymentList = payments.data?.payments ?? [];
     return paymentList.some(
       (p) =>
         p.roomId?._id === TEST_ROOM_ID &&
@@ -83,7 +92,7 @@ export default function TenantDashboard() {
         p.month === currentMonth &&
         p.paymentStatus === "paid"
     );
-  }, [payments.data, currentMonth]);
+  }, [paymentList, currentMonth]);
 
   const handlePayNow = async () => {
     try {
@@ -114,19 +123,20 @@ export default function TenantDashboard() {
 
   if (!user) return null;
 
-  const pendingBookings =
-    bookings.data?.bookings?.filter((b) => b.status === "pending").length ?? 0;
+  const bookingList = bookings.data?.bookings ?? [];
+  const maintenanceList = maintenance.data?.requests ?? [];
 
-  const paidThisMonth =
-    payments.data?.payments?.filter(
-      (p) =>
-        p.paymentStatus === "paid" &&
-        p.paidAt &&
-        new Date(p.paidAt).getMonth() === new Date().getMonth()
-    ).length ?? 0;
+  const pendingBookings = bookingList.filter((b) => b.status === "pending").length;
 
-  const openMaintenance =
-    maintenance.data?.requests?.filter((r) => r.status !== "resolved").length ?? 0;
+  const paidThisMonth = paymentList.filter(
+    (p) =>
+      p.paymentStatus === "paid" &&
+      p.month === currentMonth
+  ).length;
+
+  const openMaintenance = maintenanceList.filter(
+    (r) => r.status !== "resolved"
+  ).length;
 
   return (
     <div style={{ minHeight: "100vh", background: "var(--color-neutral-50)" }}>
@@ -193,7 +203,7 @@ export default function TenantDashboard() {
             >
               <StatCard
                 label="Booking requests"
-                value={bookings.data?.count ?? "—"}
+                value={bookingList.length}
                 sub={`${pendingBookings} pending`}
                 accent="primary"
               />
@@ -239,7 +249,7 @@ export default function TenantDashboard() {
                 <DataTable
                   headers={["Property", "Room", "Rent", "Status", "Requested"]}
                   emptyMessage="You have not made any booking requests yet."
-                  rows={(bookings.data?.bookings ?? []).slice(0, 5).map((b) => [
+                  rows={bookingList.slice(0, 5).map((b) => [
                     b.propertyId?.title ?? "—",
                     b.roomId?.label ?? "—",
                     fmtMoney(b.roomId?.rent),
@@ -249,36 +259,6 @@ export default function TenantDashboard() {
                 />
               )}
             </div>
-
-            {!user.preferences?.sleepSchedule && (
-              <div
-                style={{
-                  background: "var(--color-primary-50)",
-                  border: "1px solid var(--color-primary-200)",
-                  borderRadius: "var(--radius-lg)",
-                  padding: "1.25rem 1.5rem",
-                }}
-              >
-                <p
-                  style={{
-                    fontWeight: "600",
-                    color: "var(--color-primary-700)",
-                    marginBottom: "0.25rem",
-                  }}
-                >
-                  Complete your lifestyle preferences
-                </p>
-                <p
-                  style={{
-                    fontSize: "0.875rem",
-                    color: "var(--color-primary-600)",
-                  }}
-                >
-                  Adding your sleep schedule, noise tolerance, and habits
-                  improves your compatibility score shown to potential flatmates.
-                </p>
-              </div>
-            )}
           </div>
         )}
 
@@ -301,7 +281,7 @@ export default function TenantDashboard() {
                     "Requested",
                   ]}
                   emptyMessage="You have not made any booking requests yet."
-                  rows={(bookings.data?.bookings ?? []).map((b) => [
+                  rows={bookingList.map((b) => [
                     b.propertyId?.title ?? "—",
                     b.roomId?.label ?? "—",
                     fmtMoney(b.roomId?.rent),
@@ -324,7 +304,7 @@ export default function TenantDashboard() {
                 display: "flex",
                 justifyContent: "space-between",
                 alignItems: "center",
-                marginBottom: "1.5rem",
+                marginBottom: "1rem",
                 flexWrap: "wrap",
                 gap: "1rem",
               }}
@@ -347,6 +327,69 @@ export default function TenantDashboard() {
               </button>
             </div>
 
+            <div
+              className="card"
+              style={{
+                marginBottom: "1rem",
+                display: "flex",
+                gap: "1rem",
+                flexWrap: "wrap",
+                alignItems: "end",
+              }}
+            >
+              <div>
+                <label
+                  style={{
+                    display: "block",
+                    fontSize: "0.85rem",
+                    marginBottom: "0.35rem",
+                    color: "var(--color-neutral-600)",
+                  }}
+                >
+                  Filter by month
+                </label>
+                <input
+                  type="month"
+                  value={monthFilter}
+                  onChange={(e) => setMonthFilter(e.target.value)}
+                  className="input"
+                />
+              </div>
+
+              <div>
+                <label
+                  style={{
+                    display: "block",
+                    fontSize: "0.85rem",
+                    marginBottom: "0.35rem",
+                    color: "var(--color-neutral-600)",
+                  }}
+                >
+                  Filter by status
+                </label>
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="input"
+                >
+                  <option value="">All</option>
+                  <option value="paid">Paid</option>
+                  <option value="pending">Pending</option>
+                  <option value="failed">Failed</option>
+                </select>
+              </div>
+
+              <button
+                className="btn btn-ghost"
+                onClick={() => {
+                  setMonthFilter("");
+                  setStatusFilter("");
+                }}
+              >
+                Reset filters
+              </button>
+            </div>
+
             <div className="card">
               {payments.loading ? (
                 <LoadingSpinner />
@@ -363,7 +406,7 @@ export default function TenantDashboard() {
                     "Paid on",
                   ]}
                   emptyMessage="No payments recorded yet."
-                  rows={(payments.data?.payments ?? []).map((p) => [
+                  rows={paymentList.map((p) => [
                     p.month ?? "—",
                     p.propertyId?.title ?? "—",
                     p.roomId?.label ?? "—",
@@ -408,7 +451,7 @@ export default function TenantDashboard() {
                     "Submitted",
                   ]}
                   emptyMessage="No maintenance requests submitted yet."
-                  rows={(maintenance.data?.requests ?? []).map((r) => [
+                  rows={maintenanceList.map((r) => [
                     r.title,
                     r.category,
                     r.propertyId?.title ?? "—",

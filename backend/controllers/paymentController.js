@@ -31,6 +31,7 @@ export const createCheckoutSession = async (req, res) => {
       });
     }
 
+    // block already-paid duplicate
     const existingPaid = await Payment.findOne({
       tenantId: req.user.id,
       roomId,
@@ -45,18 +46,36 @@ export const createCheckoutSession = async (req, res) => {
       });
     }
 
-    // Save original room rent in DB
-    const payment = await Payment.create({
+    // reuse existing pending/failed record if available
+    let payment = await Payment.findOne({
       tenantId: req.user.id,
       roomId,
       propertyId,
-      amount: room.rent,
       month,
-      paymentStatus: "pending",
+      paymentStatus: { $in: ["pending", "failed"] },
     });
 
-    // TEMPORARY TEST CONVERSION:
-    // 3500 -> $35, 4000 -> $40, 5000 -> $50
+    if (!payment) {
+      payment = await Payment.create({
+        tenantId: req.user.id,
+        roomId,
+        propertyId,
+        amount: room.rent,
+        month,
+        paymentStatus: "pending",
+        currency: "BDT",
+        paymentMethod: "card",
+      });
+    } else {
+      payment.amount = room.rent;
+      payment.paymentStatus = "pending";
+      payment.currency = "BDT";
+      payment.paymentMethod = "card";
+      payment.paidAt = null;
+      await payment.save();
+    }
+
+    // TEMP TEST CONVERSION FOR STRIPE CHECKOUT ONLY
     const checkoutAmountUsd = Math.max(1, Math.round(room.rent / 100));
 
     const session = await stripe.checkout.sessions.create({
@@ -89,6 +108,11 @@ export const createCheckoutSession = async (req, res) => {
     });
 
     payment.stripeSessionId = session.id;
+    payment.stripePaymentIntentId =
+      typeof session.payment_intent === "string"
+        ? session.payment_intent
+        : null;
+
     await payment.save();
 
     return res.status(200).json({
@@ -131,6 +155,14 @@ export const stripeWebhook = async (req, res) => {
           paymentStatus: "paid",
           paidAt: new Date(),
           stripeSessionId: session.id,
+          stripePaymentIntentId:
+            typeof session.payment_intent === "string"
+              ? session.payment_intent
+              : null,
+          stripeTransactionId:
+            typeof session.payment_intent === "string"
+              ? session.payment_intent
+              : null,
         });
       }
     }
@@ -142,6 +174,7 @@ export const stripeWebhook = async (req, res) => {
       if (paymentId) {
         await Payment.findByIdAndUpdate(paymentId, {
           paymentStatus: "failed",
+          stripeSessionId: session.id,
         });
       }
     }
@@ -158,12 +191,24 @@ export const stripeWebhook = async (req, res) => {
 // ── GET /api/payments/my ───────────────────────────────────
 export const getMyPayments = async (req, res) => {
   try {
-    const payments = await Payment.find({ tenantId: req.user.id })
+    const { month, status } = req.query;
+
+    const filter = {
+      tenantId: req.user.id,
+    };
+
+    if (month) filter.month = month;
+    if (status) filter.paymentStatus = status;
+
+    const payments = await Payment.find(filter)
       .populate("roomId", "label rent")
       .populate("propertyId", "title city")
       .sort({ createdAt: -1 });
 
-    return res.status(200).json({ count: payments.length, payments });
+    return res.status(200).json({
+      count: payments.length,
+      payments,
+    });
   } catch (err) {
     console.error("getMyPayments error:", err.message);
     return res.status(500).json({ message: "Server error." });
@@ -173,16 +218,30 @@ export const getMyPayments = async (req, res) => {
 // ── GET /api/payments/property ─────────────────────────────
 export const getPropertyPayments = async (req, res) => {
   try {
-    const myProperties = await Property.find({ ownerId: req.user.id }).select("_id");
+    const { month, status } = req.query;
+
+    const myProperties = await Property.find({ ownerId: req.user.id }).select(
+      "_id"
+    );
     const propertyIds = myProperties.map((p) => p._id);
 
-    const payments = await Payment.find({ propertyId: { $in: propertyIds } })
+    const filter = {
+      propertyId: { $in: propertyIds },
+    };
+
+    if (month) filter.month = month;
+    if (status) filter.paymentStatus = status;
+
+    const payments = await Payment.find(filter)
       .populate("tenantId", "name email")
-      .populate("roomId", "label")
-      .populate("propertyId", "title city")
+      .populate("roomId", "label rent")
+      .populate("propertyId", "title city ownerId")
       .sort({ createdAt: -1 });
 
-    return res.status(200).json({ count: payments.length, payments });
+    return res.status(200).json({
+      count: payments.length,
+      payments,
+    });
   } catch (err) {
     console.error("getPropertyPayments error:", err.message);
     return res.status(500).json({ message: "Server error." });

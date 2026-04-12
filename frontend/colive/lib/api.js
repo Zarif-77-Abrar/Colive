@@ -56,8 +56,8 @@ export const bookingAPI = {
 
 // ── Payments ───────────────────────────────────────────────
 export const paymentAPI = {
-  getMy: () => request("/payments/my"),
-  getProperty: () => request("/payments/property"),
+  getMy: (query = "") => request(`/payments/my${query}`),
+  getProperty: (query = "") => request(`/payments/property${query}`),
   createCheckoutSession: (body) =>
     request("/payments/create-checkout-session", {
       method: "POST",
