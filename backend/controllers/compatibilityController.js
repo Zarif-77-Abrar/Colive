@@ -5,6 +5,7 @@ import { calculateScore } from "../utils/compatibilityScore.js";
 // ── GET /api/compatibility/:roomId ─────────────────────────
 // Returns compatibility scores between the requesting tenant
 // Also returns the average score across all flatmates.
+
 export const getRoomCompatibility = async (req, res) => {
   try {
     const room = await Room.findById(req.params.roomId)

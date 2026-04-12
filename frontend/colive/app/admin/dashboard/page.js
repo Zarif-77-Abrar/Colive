@@ -9,6 +9,7 @@ import DataTable from "../../../components/DataTable";
 import { LoadingSpinner, ErrorState } from "../../../components/LoadingState";
 import useApi from "../../../lib/useApi";
 import { getUser, adminAPI } from "../../../lib/api";
+import useFCM from "../../../lib/useFCM";
 
 const TABS = [
   { key: "overview",    label: "Overview"    },
@@ -26,6 +27,8 @@ export default function AdminDashboard() {
   const router = useRouter();
   const [user, setUser]     = useState(null);
   const [active, setActive] = useState("overview");
+
+  // useFCM();
 
   useEffect(() => {
     const u = getUser();
