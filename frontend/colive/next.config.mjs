@@ -1,4 +1,3 @@
-/** @type {import('next').NextConfig} */
 const nextConfig = {
   async headers() {
     return [
@@ -16,6 +15,9 @@ const nextConfig = {
         ],
       },
     ];
+  },
+  env: {
+    NEXT_PUBLIC_API_URL: "http://localhost:1494/api",
   },
 };
 
