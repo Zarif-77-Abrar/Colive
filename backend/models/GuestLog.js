@@ -17,15 +17,34 @@ const guestLogSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
+    relationship: {
+      type: String,         // ← NEW e.g. "Friend", "Parent", "Sibling"
+      trim: true,
+      default: "",
+    },
+    purpose: {
+      type: String,         // ← NEW
+      required: true,
+      trim: true,
+    },
     visitDate: {
       type: Date,
+      required: true,
+    },
+    visitTime: {
+      type: String,         // ← NEW — stored as "10:30 AM"
       required: true,
     },
     durationHours: {
       type: Number,
       min: 0,
     },
-    approved: {
+    status: {
+      type: String,         // ← NEW — replaces boolean approved
+      enum: ["pending", "approved", "rejected"],
+      default: "pending",
+    },
+    approved: {             // kept for backward compatibility
       type: Boolean,
       default: false,
     },
