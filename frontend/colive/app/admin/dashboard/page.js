@@ -9,7 +9,6 @@ import DataTable from "../../../components/DataTable";
 import { LoadingSpinner, ErrorState } from "../../../components/LoadingState";
 import useApi from "../../../lib/useApi";
 import { getUser, adminAPI } from "../../../lib/api";
-import useFCM from "../../../lib/useFCM";
 
 const TABS = [
   { key: "overview",    label: "Overview"    },
@@ -25,10 +24,13 @@ const fmtMoney = (n) => n != null ? `BDT ${Number(n).toLocaleString()}` : "—";
 
 export default function AdminDashboard() {
   const router = useRouter();
-  const [user, setUser]     = useState(null);
+  const [user,   setUser]   = useState(null);
   const [active, setActive] = useState("overview");
 
-  // useFCM();
+  // Blacklist action state
+  const [actionLoading, setActionLoading] = useState(null);
+  const [actionMsg,     setActionMsg]     = useState({ text: "", type: "" });
+  const [reasonInput,   setReasonInput]   = useState({});
 
   useEffect(() => {
     const u = getUser();
@@ -48,6 +50,36 @@ export default function AdminDashboard() {
 
   const s = stats.data?.stats;
 
+  const handleBlacklist = async (userId, userName) => {
+    const reason = reasonInput[userId] || "Suspended by administrator.";
+    setActionLoading(userId + "blacklist");
+    setActionMsg({ text: "", type: "" });
+    try {
+      await adminAPI.blacklistUser(userId, reason);
+      setActionMsg({ text: `${userName} has been blacklisted.`, type: "success" });
+      setReasonInput({ ...reasonInput, [userId]: "" });
+      setTimeout(() => window.location.reload(), 1200);
+    } catch (err) {
+      setActionMsg({ text: err.message, type: "error" });
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleUnblacklist = async (userId, userName) => {
+    setActionLoading(userId + "unblacklist");
+    setActionMsg({ text: "", type: "" });
+    try {
+      await adminAPI.unblacklistUser(userId);
+      setActionMsg({ text: `${userName}'s account has been reinstated.`, type: "success" });
+      setTimeout(() => window.location.reload(), 1200);
+    } catch (err) {
+      setActionMsg({ text: err.message, type: "error" });
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
   return (
     <div style={{ minHeight: "100vh", background: "var(--color-neutral-50)" }}>
       <Navbar />
@@ -65,15 +97,15 @@ export default function AdminDashboard() {
 
             {stats.loading ? <LoadingSpinner /> : stats.error ? <ErrorState message={stats.error} /> : (
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: "1rem", marginBottom: "2rem" }}>
-                <StatCard label="Total users"       value={s?.totalUsers       ?? "—"} sub={`${s?.totalTenants ?? 0} tenants · ${s?.totalOwners ?? 0} owners`} accent="primary" />
-                <StatCard label="Active properties" value={s?.totalProperties  ?? "—"} sub={`${s?.totalRooms ?? 0} rooms total`}    accent="success" />
-                <StatCard label="Available rooms"   value={s?.availableRooms   ?? "—"} sub="across platform"                        accent="success" />
-                <StatCard label="Pending bookings"  value={s?.pendingBookings  ?? "—"} sub="awaiting owner response"                accent="warning" />
-                <StatCard label="Open maintenance"  value={s?.openMaintenance  ?? "—"} sub="unresolved requests"                    accent="error"   />
+                <StatCard label="Total users"        value={s?.totalUsers      ?? "—"} sub={`${s?.totalTenants ?? 0} tenants · ${s?.totalOwners ?? 0} owners`} accent="primary" />
+                <StatCard label="Active properties"  value={s?.totalProperties ?? "—"} sub={`${s?.totalRooms ?? 0} rooms total`}   accent="success" />
+                <StatCard label="Available rooms"    value={s?.availableRooms  ?? "—"} sub="across platform"                       accent="success" />
+                <StatCard label="Pending bookings"   value={s?.pendingBookings ?? "—"} sub="awaiting owner response"               accent="warning" />
+                <StatCard label="Open maintenance"   value={s?.openMaintenance ?? "—"} sub="unresolved requests"                  accent="error"   />
+                <StatCard label="Blacklisted users"  value={s?.blacklistedUsers ?? "—"} sub="suspended accounts"                  accent="error"   />
               </div>
             )}
 
-            {/* Recent users */}
             <div className="card" style={{ marginBottom: "1.5rem" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
                 <h4>Recently joined users</h4>
@@ -84,17 +116,12 @@ export default function AdminDashboard() {
                   headers={["Name", "Email", "Role", "University", "Joined"]}
                   emptyMessage="No users yet."
                   rows={(users.data?.users ?? []).slice(0, 5).map(u => [
-                    u.name,
-                    u.email,
-                    u.role,
-                    u.university ?? "—",
-                    fmtDate(u.createdAt),
+                    u.name, u.email, u.role, u.university ?? "—", fmtDate(u.createdAt),
                   ])}
                 />
               )}
             </div>
 
-            {/* Recent maintenance */}
             <div className="card">
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
                 <h4>Recent maintenance requests</h4>
@@ -105,12 +132,8 @@ export default function AdminDashboard() {
                   headers={["Title", "Category", "Property", "Submitted by", "Status", "Date"]}
                   emptyMessage="No maintenance requests yet."
                   rows={(maintenance.data?.requests ?? []).slice(0, 5).map(r => [
-                    r.title,
-                    r.category,
-                    r.propertyId?.title ?? "—",
-                    r.createdBy?.name   ?? "—",
-                    r.status,
-                    fmtDate(r.createdAt),
+                    r.title, r.category, r.propertyId?.title ?? "—",
+                    r.createdBy?.name ?? "—", r.status, fmtDate(r.createdAt),
                   ])}
                 />
               )}
@@ -122,22 +145,103 @@ export default function AdminDashboard() {
         {active === "users" && (
           <div>
             <h3 style={{ marginBottom: "1.5rem" }}>All users</h3>
-            <div className="card">
-              {users.loading ? <LoadingSpinner /> : users.error ? <ErrorState message={users.error} /> : (
-                <DataTable
-                  headers={["Name", "Email", "Role", "University", "Phone", "Joined"]}
-                  emptyMessage="No users registered yet."
-                  rows={(users.data?.users ?? []).map(u => [
-                    u.name,
-                    u.email,
-                    u.role,
-                    u.university ?? "—",
-                    u.phone      ?? "—",
-                    fmtDate(u.createdAt),
-                  ])}
-                />
-              )}
-            </div>
+
+            {actionMsg.text && (
+              <div style={{
+                padding: "0.75rem 1rem", borderRadius: "var(--radius-md)",
+                marginBottom: "1.25rem", fontSize: "0.875rem",
+                background: actionMsg.type === "success" ? "var(--color-success-50)" : "var(--color-error-50)",
+                border: `1px solid ${actionMsg.type === "success" ? "var(--color-success-500)" : "var(--color-error-500)"}`,
+                color: actionMsg.type === "success" ? "var(--color-success-700)" : "var(--color-error-700)",
+              }}>
+                {actionMsg.text}
+              </div>
+            )}
+
+            {users.loading ? <LoadingSpinner /> : users.error ? <ErrorState message={users.error} /> : (
+              <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+                {(users.data?.users ?? []).map((u) => (
+                  <div key={u._id} className="card" style={{
+                    borderLeft: u.isBlacklisted ? "4px solid var(--color-error-500)" : "none",
+                    borderRadius: u.isBlacklisted ? "0 var(--radius-xl) var(--radius-xl) 0" : undefined,
+                  }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "1rem" }}>
+                      <div>
+                        <div style={{ display: "flex", alignItems: "center", gap: "0.625rem", marginBottom: "0.375rem" }}>
+                          <p style={{ fontWeight: "600", fontSize: "1rem" }}>{u.name}</p>
+                          <span style={{
+                            fontSize: "0.7rem", fontWeight: "600",
+                            padding: "0.15rem 0.5rem", borderRadius: "9999px",
+                            background: u.role === "admin" ? "var(--color-error-50)"
+                              : u.role === "owner" ? "var(--color-warning-50)"
+                              : "var(--color-primary-50)",
+                            color: u.role === "admin" ? "var(--color-error-700)"
+                              : u.role === "owner" ? "var(--color-warning-700)"
+                              : "var(--color-primary-700)",
+                          }}>
+                            {u.role}
+                          </span>
+                          {u.isBlacklisted && (
+                            <span style={{
+                              fontSize: "0.7rem", fontWeight: "600",
+                              padding: "0.15rem 0.5rem", borderRadius: "9999px",
+                              background: "var(--color-error-50)", color: "var(--color-error-700)",
+                              border: "1px solid var(--color-error-300)",
+                            }}>
+                              Blacklisted
+                            </span>
+                          )}
+                        </div>
+                        <p style={{ fontSize: "0.875rem", color: "var(--color-neutral-500)", marginBottom: "0.25rem" }}>
+                          {u.email} {u.university ? `· ${u.university}` : ""}
+                        </p>
+                        <p style={{ fontSize: "0.8125rem", color: "var(--color-neutral-400)" }}>
+                          Joined {fmtDate(u.createdAt)}
+                        </p>
+                        {u.isBlacklisted && u.blacklistReason && (
+                          <p style={{ fontSize: "0.8125rem", color: "var(--color-error-600)", marginTop: "0.375rem" }}>
+                            Reason: {u.blacklistReason}
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Actions — skip for admins */}
+                      {u.role !== "admin" && (
+                        <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", alignItems: "flex-end" }}>
+                          {!u.isBlacklisted ? (
+                            <>
+                              <input
+                                type="text"
+                                className="input"
+                                placeholder="Reason (optional)"
+                                style={{ width: "220px", fontSize: "0.8125rem" }}
+                                value={reasonInput[u._id] || ""}
+                                onChange={(e) => setReasonInput({ ...reasonInput, [u._id]: e.target.value })}
+                              />
+                              <button
+                                className="btn btn-danger btn-sm"
+                                disabled={!!actionLoading}
+                                onClick={() => handleBlacklist(u._id, u.name)}
+                              >
+                                {actionLoading === u._id + "blacklist" ? "..." : "Blacklist"}
+                              </button>
+                            </>
+                          ) : (
+                            <button
+                              className="btn btn-secondary btn-sm"
+                              disabled={!!actionLoading}
+                              onClick={() => handleUnblacklist(u._id, u.name)}
+                            >
+                              {actionLoading === u._id + "unblacklist" ? "..." : "Reinstate"}
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -151,12 +255,9 @@ export default function AdminDashboard() {
                   headers={["Title", "Owner", "City", "Rent range", "Available rooms", "Listed on"]}
                   emptyMessage="No properties listed yet."
                   rows={(properties.data?.properties ?? []).map(p => [
-                    p.title,
-                    p.ownerId?.name ?? "—",
-                    p.city,
+                    p.title, p.ownerId?.name ?? "—", p.city,
                     p.rentRange?.min != null ? `${fmtMoney(p.rentRange.min)} – ${fmtMoney(p.rentRange.max)}` : "—",
-                    p.availableRooms ?? "—",
-                    fmtDate(p.createdAt),
+                    p.availableRooms ?? "—", fmtDate(p.createdAt),
                   ])}
                 />
               )}
@@ -172,15 +273,12 @@ export default function AdminDashboard() {
               {bookings.loading ? <LoadingSpinner /> : bookings.error ? <ErrorState message={bookings.error} /> : (
                 <DataTable
                   headers={["Tenant", "Owner", "Property", "Room", "Compatibility", "Status", "Date"]}
-                  emptyMessage="No booking requests on the platform yet."
+                  emptyMessage="No booking requests yet."
                   rows={(bookings.data?.bookings ?? []).map(b => [
-                    b.tenantId?.name    ?? "—",
-                    b.ownerId?.name     ?? "—",
-                    b.propertyId?.title ?? "—",
-                    b.roomId?.label     ?? "—",
+                    b.tenantId?.name ?? "—", b.ownerId?.name ?? "—",
+                    b.propertyId?.title ?? "—", b.roomId?.label ?? "—",
                     b.compatibilityScore != null ? `${b.compatibilityScore}%` : "—",
-                    b.status,
-                    fmtDate(b.createdAt),
+                    b.status, fmtDate(b.createdAt),
                   ])}
                 />
               )}
@@ -196,15 +294,11 @@ export default function AdminDashboard() {
               {maintenance.loading ? <LoadingSpinner /> : maintenance.error ? <ErrorState message={maintenance.error} /> : (
                 <DataTable
                   headers={["Title", "Category", "Property", "Room", "Submitted by", "Status", "Date"]}
-                  emptyMessage="No maintenance requests on the platform yet."
+                  emptyMessage="No maintenance requests yet."
                   rows={(maintenance.data?.requests ?? []).map(r => [
-                    r.title,
-                    r.category,
-                    r.propertyId?.title ?? "—",
-                    r.roomId?.label     ?? "—",
-                    r.createdBy?.name   ?? "—",
-                    r.status,
-                    fmtDate(r.createdAt),
+                    r.title, r.category, r.propertyId?.title ?? "—",
+                    r.roomId?.label ?? "—", r.createdBy?.name ?? "—",
+                    r.status, fmtDate(r.createdAt),
                   ])}
                 />
               )}
@@ -234,9 +328,6 @@ export default function AdminDashboard() {
                           <span style={{ fontSize: "0.75rem", color: "var(--color-neutral-400)" }}>{fmtDate(n.createdAt)}</span>
                           <span style={{ fontSize: "0.75rem", background: "var(--color-info-50)", color: "var(--color-info-700)", padding: "0.15rem 0.5rem", borderRadius: "9999px" }}>
                             {n.propertyId?.title ?? "Platform-wide"}
-                          </span>
-                          <span style={{ fontSize: "0.75rem", color: "var(--color-neutral-500)" }}>
-                            by {n.createdBy?.name ?? "—"}
                           </span>
                         </div>
                       </div>
