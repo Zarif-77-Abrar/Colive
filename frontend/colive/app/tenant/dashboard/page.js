@@ -72,7 +72,7 @@ export default function TenantDashboard() {
   const [active, setActive] = useState("overview");
 
   useFCM();
-
+  
   // ── Others sub-section ─────────────────────────────────
   const [othersSection, setOthersSection] = useState(null); // null | "guest"
 
