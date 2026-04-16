@@ -18,7 +18,11 @@ const request = async (endpoint, options = {}) => {
   const data = await res.json();
 
   if (!res.ok) {
-    throw new Error(data.message || data.errors?.[0]?.msg || "Something went wrong.");
+    // Preserve the blacklist code so the login page can detect it
+    const err = new Error(data.message || data.errors?.[0]?.msg || "Something went wrong.");
+    err.code   = data.code ?? null;
+    err.reason = data.reason ?? null;
+    throw err;
   }
 
   return data;
@@ -31,9 +35,11 @@ export const authAPI = {
 };
 
 export const userAPI = {
-  getProfile:        ()     => request("/users/profile"),
-  updateProfile:     (body) => request("/users/profile",     { method: "PUT", body: JSON.stringify(body) }),
-  updatePreferences: (body) => request("/users/preferences", { method: "PUT", body: JSON.stringify(body) }),
+  getProfile:        ()      => request("/users/profile"),
+  updateProfile:     (body)  => request("/users/profile",     { method: "PUT",    body: JSON.stringify(body) }),
+  updatePreferences: (body)  => request("/users/preferences", { method: "PUT",    body: JSON.stringify(body) }),
+  saveFcmToken:      (token) => request("/users/fcm-token",   { method: "POST",   body: JSON.stringify({ token }) }),
+  removeFcmToken:    (token) => request("/users/fcm-token",   { method: "DELETE", body: JSON.stringify({ token }) }),
 };
 
 export const propertyAPI = {
@@ -43,8 +49,11 @@ export const propertyAPI = {
 };
 
 export const bookingAPI = {
-  getMy:       () => request("/bookings/my"),
-  getReceived: () => request("/bookings/received"),
+  getMy:       ()     => request("/bookings/my"),
+  getReceived: ()     => request("/bookings/received"),
+  create:      (body) => request("/bookings",              { method: "POST", body: JSON.stringify(body) }),
+  accept:      (id)   => request(`/bookings/${id}/accept`, { method: "PUT" }),
+  reject:      (id)   => request(`/bookings/${id}/reject`, { method: "PUT" }),
 };
 
 export const paymentAPI = {
@@ -74,6 +83,26 @@ export const maintenanceAPI = {
   }),
 };
 
+// ── Guest Log ────────────────────────────────────────────
+
+export const guestLogAPI = {
+  // Tenant
+  getMy:    ()     => request("/guests/my"),
+  create:   (body) => request("/guests", { method: "POST", body: JSON.stringify(body) }),
+ 
+  // Owner
+  getProperty: () => request("/guests/property"),
+ 
+  // Admin
+  getAll:   ()     => request("/guests/all"),
+ 
+  // Owner + Admin
+  updateStatus: (id, status) => request(`/guests/${id}/status`, {
+    method: "PATCH",
+    body: JSON.stringify({ status }),
+  }),
+};
+
 export const noticeAPI = {
   getMy: () => request("/notices/my"),
 };
@@ -83,22 +112,23 @@ export const compatibilityAPI = {
 };
 
 export const conversationAPI = {
-  getAll:     ()                      => request("/conversations"),
-  getById:    (id)                    => request(`/conversations/${id}`),
-  create:     (participants, roomId)  => request("/conversations", { method: "POST", body: JSON.stringify({participants, roomId}) }),
-  sendMessage: (conversationId, content) => request(`/conversations/${conversationId}/messages`, { method: "POST", body: JSON.stringify({content}) }),
-  markAsRead: (conversationId)        => request(`/conversations/${conversationId}/read`, { method: "PUT" }),
-  // delete:     (conversationId)        => request(`/conversations/${conversationId}`, { method: "DELETE" }),
+  getAll:      ()                            => request("/conversations"),
+  getById:     (id)                          => request(`/conversations/${id}`),
+  create:      (participants, relatedRoomId) => request("/conversations", { method: "POST", body: JSON.stringify({ participants, relatedRoomId }) }),
+  sendMessage: (conversationId, content)     => request(`/conversations/${conversationId}/messages`, { method: "POST", body: JSON.stringify({ content }) }),
+  markAsRead:  (conversationId)              => request(`/conversations/${conversationId}/read`, { method: "PUT" }),
 };
 
 export const adminAPI = {
-  getStats:       () => request("/admin/stats"),
-  getUsers:       () => request("/admin/users"),
-  getProperties:  () => request("/admin/properties"),
-  getBookings:    () => request("/admin/bookings"),
-  getMaintenance: () => request("/admin/maintenance"),
-  getNotices:     () => request("/admin/notices"),
-  createAdmin:    (body) => request("/admin/create-admin", { method: "POST", body: JSON.stringify(body) }),
+  getStats:         () => request("/admin/stats"),
+  getUsers:         () => request("/admin/users"),
+  getProperties:    () => request("/admin/properties"),
+  getBookings:      () => request("/admin/bookings"),
+  getMaintenance:   () => request("/admin/maintenance"),
+  getNotices:       () => request("/admin/notices"),
+  createAdmin:      (body) => request("/admin/create-admin",        { method: "POST", body: JSON.stringify(body) }),
+  blacklistUser:    (id, reason) => request(`/admin/users/${id}/blacklist`,   { method: "PUT", body: JSON.stringify({ reason }) }),
+  unblacklistUser:  (id)  => request(`/admin/users/${id}/unblacklist`, { method: "PUT" }),
 };
 
 export const saveToken   = (token) => localStorage.setItem("token", token);
@@ -107,4 +137,12 @@ export const removeToken = ()      => localStorage.removeItem("token");
 export const saveUser    = (user)  => localStorage.setItem("user", JSON.stringify(user));
 export const getUser     = ()      => { const u = localStorage.getItem("user"); return u ? JSON.parse(u) : null; };
 export const removeUser  = ()      => localStorage.removeItem("user");
-export const logout      = ()      => { removeToken(); removeUser(); window.location.href = "/login"; };
+export const logout      = () => {
+  const fcmToken = localStorage.getItem("fcmToken");
+  removeToken();
+  removeUser();
+  localStorage.removeItem("fcmToken");
+  localStorage.removeItem("fcmTokenUserId");
+  if (fcmToken) userAPI.removeFcmToken(fcmToken).catch(() => {});
+  window.location.href = "/login";
+};
