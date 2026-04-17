@@ -64,6 +64,19 @@ const paymentSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+
+    // ── Combined utility-bill fields (optional) ─────────────
+    // Populated when a utility bill share is included in the same checkout session.
+    utilityAmount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    billSplitId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "BillSplit",
+      default: null,
+    },
   },
   { timestamps: true }
 );

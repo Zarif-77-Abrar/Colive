@@ -6,6 +6,7 @@ import {
   getPropertyPayments,
   createCheckoutSession,
   verifySession,
+  payUtilityOnly,
 } from "../controllers/paymentController.js";
 
 const router = express.Router();
@@ -20,5 +21,6 @@ router.post(
 router.get("/my", auth, requireRole("tenant"), getMyPayments);
 router.get("/verify-session", auth, requireRole("tenant"), verifySession);
 router.get("/property", auth, requireRole("owner"), getPropertyPayments);
+router.post("/pay-utility", auth, requireRole("tenant"), payUtilityOnly);
 
 export default router;

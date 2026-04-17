@@ -71,6 +71,7 @@ export default function TenantDashboard() {
   const [active,  setActive]  = useState("overview");
   
   const [paying, setPaying] = useState(false);
+  const [payingUtility, setPayingUtility] = useState(false);
   const [monthFilter, setMonthFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
 
@@ -159,6 +160,7 @@ export default function TenantDashboard() {
       await utilityBillAPI.markPaid(splitId);
       setBillSuccess("Marked as paid!");
       fetchBillSplits();
+      payments.refetch(); // backend now creates a Payment record — update history too
       setTimeout(() => setBillSuccess(""), 3000);
     } catch (err) {
       alert(err.message || "Failed to mark as paid.");
@@ -194,6 +196,7 @@ export default function TenantDashboard() {
     (p) =>
       p.month === currentMonth &&
       p.paymentStatus === "paid" &&
+      p.amount > 0 &&          // must be a rent payment, not utility-only
       currentRoomId &&
       (p.roomId?._id || p.roomId)?.toString() === currentRoomId
   );
@@ -211,13 +214,14 @@ export default function TenantDashboard() {
         .then(() => {
           // Clean up the URL params
           window.history.replaceState({}, "", "/tenant/dashboard?tab=payments");
-          // Refetch payments to show updated status
+          // Refetch payments AND bill splits to show updated statuses
           payments.refetch();
+          fetchBillSplits();
         })
         .catch((err) => {
           console.error("verifySession error:", err.message);
-          // Still refetch in case webhook already handled it
           payments.refetch();
+          fetchBillSplits();
         });
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -235,10 +239,16 @@ export default function TenantDashboard() {
         return;
       }
 
+      // Find an unpaid utility bill split for the current month
+      const unpaidBillSplit = billSplits.find(
+        (s) => s.status === "unpaid" && s.billId?.month === currentMonth
+      );
+
       const res = await paymentAPI.createCheckoutSession({
         roomId: activeBooking.roomId?._id || activeBooking.roomId,
         propertyId: activeBooking.propertyId?._id || activeBooking.propertyId,
         month: currentMonth,
+        ...(unpaidBillSplit ? { includeBillSplitId: unpaidBillSplit._id } : {}),
       });
 
       if (res.url) {
@@ -250,6 +260,22 @@ export default function TenantDashboard() {
       alert("Payment failed: " + err.message);
     } finally {
       setPaying(false);
+    }
+  };
+
+  const handlePayUtilityNow = async (splitId) => {
+    setPayingUtility(true);
+    try {
+      const res = await paymentAPI.payUtilityBill({ billSplitId: splitId });
+      if (res.url) {
+        window.location.href = res.url;
+      } else {
+        alert("Error fetching checkout url");
+      }
+    } catch (err) {
+      alert("Utility payment failed: " + err.message);
+    } finally {
+      setPayingUtility(false);
     }
   };
 
@@ -578,22 +604,110 @@ export default function TenantDashboard() {
               }}
             >
               <h3>Payment history</h3>
-              <button
-                className="btn btn-primary btn-sm"
-                onClick={handlePayNow}
-                disabled={paying || alreadyPaidForTestRoom}
-                style={{
-                  opacity: paying || alreadyPaidForTestRoom ? 0.65 : 1,
-                  cursor: paying || alreadyPaidForTestRoom ? "not-allowed" : "pointer",
-                }}
-              >
-                {alreadyPaidForTestRoom
+              {(() => {
+                const activeBooking = (bookings.data?.bookings ?? []).find(
+                  (b) => b.status === "accepted"
+                );
+                const unpaidBill = billSplits.find(
+                  (s) => s.status === "unpaid" && s.billId?.month === currentMonth
+                );
+                const rentAmount = activeBooking?.roomId?.rent ?? 0;
+                const totalAmount = rentAmount + (unpaidBill ? unpaidBill.amount : 0);
+                const btnLabel = alreadyPaidForTestRoom
                   ? "Already Paid"
                   : paying
                   ? "Redirecting..."
-                  : "Pay Now"}
-              </button>
+                  : totalAmount > 0
+                  ? `Pay BDT ${totalAmount.toLocaleString()}`
+                  : "Pay Now";
+                return (
+                  <button
+                    className="btn btn-primary btn-sm"
+                    onClick={handlePayNow}
+                    disabled={paying || alreadyPaidForTestRoom}
+                    style={{
+                      opacity: paying || alreadyPaidForTestRoom ? 0.65 : 1,
+                      cursor: paying || alreadyPaidForTestRoom ? "not-allowed" : "pointer",
+                    }}
+                  >
+                    {btnLabel}
+                  </button>
+                );
+              })()}
             </div>
+
+            {/* ── Utility bill notice / standalone pay button ── */}
+            {(() => {
+              const unpaidBillThisMonth = billSplits.find(
+                (s) => s.status === "unpaid" && s.billId?.month === currentMonth
+              );
+              if (!unpaidBillThisMonth) return null;
+
+              // Rent is NOT yet paid → combined notice (bill will be included with rent)
+              if (!alreadyPaidForTestRoom) {
+                const activeBooking = (bookings.data?.bookings ?? []).find(
+                  (b) => b.status === "accepted"
+                );
+                if (!activeBooking) return null;
+                return (
+                  <div style={{
+                    background: "#fffbeb", border: "1px solid #fcd34d",
+                    borderRadius: "10px", padding: "1rem 1.25rem",
+                    marginBottom: "1rem", display: "flex",
+                    alignItems: "flex-start", gap: "0.75rem",
+                  }}>
+                    <span style={{ fontSize: "1.25rem", lineHeight: 1 }}>⚡</span>
+                    <div>
+                      <p style={{ fontWeight: "600", color: "#92400e", marginBottom: "0.2rem", fontSize: "0.9rem" }}>
+                        Utility bill will be included in your payment
+                      </p>
+                      <p style={{ color: "#b45309", fontSize: "0.8125rem" }}>
+                        Your unpaid utility bill share for <strong>{currentMonth}</strong> —{" "}
+                        <strong>BDT {unpaidBillThisMonth.amount?.toLocaleString()}</strong> — will be charged together with your rent.
+                      </p>
+                    </div>
+                  </div>
+                );
+              }
+
+              // Rent IS already paid → show standalone utility payment button
+              return (
+                <div style={{
+                  background: "#fff7ed", border: "1px solid #fb923c",
+                  borderRadius: "10px", padding: "1rem 1.25rem",
+                  marginBottom: "1rem", display: "flex",
+                  justifyContent: "space-between", alignItems: "center",
+                  flexWrap: "wrap", gap: "0.75rem",
+                }}>
+                  <div style={{ display: "flex", alignItems: "flex-start", gap: "0.75rem" }}>
+                    <span style={{ fontSize: "1.25rem", lineHeight: 1 }}>⚡</span>
+                    <div>
+                      <p style={{ fontWeight: "600", color: "#c2410c", marginBottom: "0.2rem", fontSize: "0.9rem" }}>
+                        Utility bill pending for {currentMonth}
+                      </p>
+                      <p style={{ color: "#ea580c", fontSize: "0.8125rem" }}>
+                        Your share:{" "}
+                        <strong>BDT {unpaidBillThisMonth.amount?.toLocaleString()}</strong>
+                        . Your rent is already paid — pay the utility separately.
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => handlePayUtilityNow(unpaidBillThisMonth._id)}
+                    disabled={payingUtility}
+                    style={{
+                      background: "#ea580c", color: "#fff",
+                      border: "none", borderRadius: "8px",
+                      padding: "0.55rem 1.25rem", fontWeight: "600",
+                      fontSize: "0.875rem", cursor: payingUtility ? "not-allowed" : "pointer",
+                      opacity: payingUtility ? 0.65 : 1, whiteSpace: "nowrap",
+                    }}
+                  >
+                    {payingUtility ? "Redirecting..." : `Pay Utility — BDT ${unpaidBillThisMonth.amount?.toLocaleString()}`}
+                  </button>
+                </div>
+              );
+            })()}
 
             <div
               className="card"
@@ -661,11 +775,13 @@ export default function TenantDashboard() {
             <div className="card">
               {payments.loading ? <LoadingSpinner /> : payments.error ? <ErrorState message={payments.error} /> : (
                 <DataTable
-                  headers={["Month", "Property", "Room", "Amount", "Status", "Paid on"]}
+                  headers={["Month", "Property", "Room", "Rent", "Utility", "Status", "Paid on"]}
                   emptyMessage="No payments recorded yet."
                   rows={paymentList.filter(p => (!monthFilter || p.month === monthFilter) && (!statusFilter || p.paymentStatus === statusFilter)).map(p => [
                     p.month ?? "—", p.propertyId?.title ?? "—", p.roomId?.label ?? "—",
-                    fmtMoney(p.amount), p.paymentStatus, fmtDate(p.paidAt),
+                    p.amount > 0 ? fmtMoney(p.amount) : "—",
+                    p.utilityAmount > 0 ? fmtMoney(p.utilityAmount) : "—",
+                    p.paymentStatus, fmtDate(p.paidAt),
                   ])}
                 />
               )}
@@ -1108,14 +1224,39 @@ export default function TenantDashboard() {
                               </div>
 
                               {/* Action */}
-                              <div style={{ display: "flex", alignItems: "center" }}>
+                              <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "0.5rem" }}>
                                 {!isPaid ? (
-                                  <button
-                                    onClick={() => handleMarkBillPaid(s._id)}
-                                    style={{ background: "#1d4ed8", color: "#fff", border: "none", borderRadius: "8px", padding: "0.5rem 1.25rem", fontWeight: "600", fontSize: "0.8125rem", cursor: "pointer" }}
-                                  >
-                                    Mark as Paid
-                                  </button>
+                                  <>
+                                    {/* Primary: pay through Stripe */}
+                                    <button
+                                      onClick={() => handlePayUtilityNow(s._id)}
+                                      disabled={payingUtility}
+                                      style={{
+                                        background: "#1d4ed8", color: "#fff",
+                                        border: "none", borderRadius: "8px",
+                                        padding: "0.5rem 1.25rem",
+                                        fontWeight: "600", fontSize: "0.8125rem",
+                                        cursor: payingUtility ? "not-allowed" : "pointer",
+                                        opacity: payingUtility ? 0.65 : 1,
+                                        whiteSpace: "nowrap",
+                                      }}
+                                    >
+                                      {payingUtility ? "Redirecting..." : `💳 Pay BDT ${s.amount?.toLocaleString()}`}
+                                    </button>
+                                    {/* Secondary: manual / cash acknowledgment */}
+                                    <button
+                                      onClick={() => handleMarkBillPaid(s._id)}
+                                      style={{
+                                        background: "transparent", color: "#6b7280",
+                                        border: "1px solid #d1d5db", borderRadius: "8px",
+                                        padding: "0.35rem 0.875rem",
+                                        fontWeight: "500", fontSize: "0.75rem",
+                                        cursor: "pointer",
+                                      }}
+                                    >
+                                      Mark as paid (cash)
+                                    </button>
+                                  </>
                                 ) : (
                                   <span style={{ fontSize: "0.875rem", color: "#15803d", fontWeight: "600" }}>✓ Paid</span>
                                 )}

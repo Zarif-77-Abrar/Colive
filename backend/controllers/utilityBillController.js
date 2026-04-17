@@ -2,6 +2,7 @@ import UtilityBill from "../models/UtilityBill.js";
 import BillSplit from "../models/BillSplit.js";
 import Property from "../models/Property.js";
 import Room from "../models/Room.js";
+import Payment from "../models/Payment.js";
 
 // ── POST /api/bills ─────────────────────────────────────────
 // Owner enters electricity/water/gas/internet for a property+month.
@@ -111,10 +112,11 @@ export const getPropertyBills = async (req, res) => {
 };
 
 // ── PATCH /api/bills/splits/:id/pay ─────────────────────────
-// Tenant marks their share as paid
+// Tenant marks their share as paid (manual / cash method)
 export const markSplitPaid = async (req, res) => {
   try {
-    const split = await BillSplit.findById(req.params.id);
+    // Populate bill so we have month + propertyId
+    const split = await BillSplit.findById(req.params.id).populate("billId");
     if (!split) return res.status(404).json({ message: "Bill split not found." });
 
     if (split.userId.toString() !== req.user.id) {
@@ -126,6 +128,31 @@ export const markSplitPaid = async (req, res) => {
 
     split.status = "paid";
     await split.save();
+
+    // ── Create a Payment record so it appears in payment history ──
+    try {
+      const bill = split.billId;
+      // Only create if we don't already have a payment for this split
+      const existing = await Payment.findOne({ billSplitId: split._id });
+      if (!existing && bill) {
+        await Payment.create({
+          tenantId:      split.userId,
+          roomId:        split.roomId,
+          propertyId:    bill.propertyId,
+          amount:        0,              // no rent — utility only
+          utilityAmount: split.amount,
+          billSplitId:   split._id,
+          month:         bill.month,
+          paymentStatus: "paid",
+          currency:      "BDT",
+          paymentMethod: "manual",      // distinguishes from Stripe payments
+          paidAt:        new Date(),
+        });
+      }
+    } catch (payErr) {
+      // Don't fail the whole request if Payment record creation fails
+      console.warn("markSplitPaid: could not create Payment record:", payErr.message);
+    }
 
     return res.status(200).json({ message: "Bill share marked as paid.", split });
   } catch (err) {

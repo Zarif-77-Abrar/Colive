@@ -75,6 +75,11 @@ export const paymentAPI = {
     }),
   verifySession: (sessionId) =>
     request(`/payments/verify-session?sessionId=${sessionId}`),
+  payUtilityBill: (body) =>
+    request("/payments/pay-utility", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
 };
 
 export const utilityBillAPI = {
