@@ -5,7 +5,7 @@ import Room from "../models/Room.js";
 
 const getStripe = () => {
   if (!process.env.STRIPE_SECRET_KEY) {
-    throw new Error("STRIPE_SECRET_KEY is missing in .env");
+    return null; // Return null instead of throwing to allow mock flow
   }
   return new Stripe(process.env.STRIPE_SECRET_KEY);
 };
@@ -75,8 +75,17 @@ export const createCheckoutSession = async (req, res) => {
       await payment.save();
     }
 
-    // TEMP TEST CONVERSION FOR STRIPE CHECKOUT ONLY
-    const checkoutAmountUsd = Math.max(1, Math.round(room.rent / 100));
+    if (!stripe) {
+      payment.paymentStatus = "paid";
+      payment.paidAt = new Date();
+      await payment.save();
+      
+      const clientUrl = process.env.CLIENT_URL || "http://localhost:3000";
+      return res.status(200).json({
+        message: "Mock checkout completed.",
+        url: `${clientUrl}/tenant/dashboard?payment=success`,
+      });
+    }
 
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
@@ -84,18 +93,19 @@ export const createCheckoutSession = async (req, res) => {
       line_items: [
         {
           price_data: {
-            currency: "usd",
+            currency: "bdt",
             product_data: {
               name: `${property.title} - ${room.label} Rent`,
               description: `Monthly rent for ${month}`,
             },
-            unit_amount: checkoutAmountUsd * 100,
+            // Stripe unit_amount is in smallest unit: paisa (100 paisa = 1 BDT)
+            unit_amount: room.rent * 100,
           },
           quantity: 1,
         },
       ],
-      success_url: `${process.env.CLIENT_URL}/tenant/dashboard?payment=success`,
-      cancel_url: `${process.env.CLIENT_URL}/tenant/dashboard?payment=cancelled`,
+      success_url: `${process.env.CLIENT_URL || "http://localhost:3000"}/tenant/dashboard?payment=success&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${process.env.CLIENT_URL || "http://localhost:3000"}/tenant/dashboard?payment=cancelled`,
       metadata: {
         paymentId: payment._id.toString(),
         tenantId: req.user.id.toString(),
@@ -103,7 +113,6 @@ export const createCheckoutSession = async (req, res) => {
         propertyId: propertyId.toString(),
         month,
         originalRent: room.rent.toString(),
-        checkoutAmountUsd: checkoutAmountUsd.toString(),
       },
     });
 
@@ -124,6 +133,53 @@ export const createCheckoutSession = async (req, res) => {
     return res.status(500).json({
       message: err.message || "Server error while creating checkout session.",
     });
+  }
+};
+
+// ── GET /api/payments/verify-session ──────────────────────
+export const verifySession = async (req, res) => {
+  try {
+    const stripe = getStripe();
+    const { sessionId } = req.query;
+
+    if (!stripe) {
+      return res.status(400).json({ message: "Stripe not configured." });
+    }
+    if (!sessionId) {
+      return res.status(400).json({ message: "sessionId is required." });
+    }
+
+    // Retrieve the session directly from Stripe
+    const session = await stripe.checkout.sessions.retrieve(sessionId);
+
+    if (session.payment_status !== "paid") {
+      return res.status(200).json({ status: session.payment_status });
+    }
+
+    const paymentId = session.metadata?.paymentId;
+    if (!paymentId) {
+      return res.status(400).json({ message: "No paymentId in session metadata." });
+    }
+
+    // Update the payment record to paid
+    const updated = await Payment.findByIdAndUpdate(
+      paymentId,
+      {
+        paymentStatus: "paid",
+        paidAt: new Date(),
+        stripeSessionId: session.id,
+        stripePaymentIntentId:
+          typeof session.payment_intent === "string" ? session.payment_intent : null,
+        stripeTransactionId:
+          typeof session.payment_intent === "string" ? session.payment_intent : null,
+      },
+      { new: true }
+    );
+
+    return res.status(200).json({ status: "paid", payment: updated });
+  } catch (err) {
+    console.error("verifySession error:", err.message);
+    return res.status(500).json({ message: err.message || "Server error." });
   }
 };
 

@@ -69,7 +69,15 @@ const maintenanceRequestSchema = new mongoose.Schema(
     },
     resolvedAt: {
       type: Date,
-      default: null,                    // ← NEW (set when status → resolved)
+      default: null,
+    },
+    tenantConfirmed: {
+      type: Boolean,
+      default: false,
+    },
+    tenantConfirmedAt: {
+      type: Date,
+      default: null,
     },
   },
   { timestamps: true }

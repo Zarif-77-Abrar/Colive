@@ -69,6 +69,10 @@ export default function TenantDashboard() {
   const [user,    setUser]    = useState(null);
   const [profile, setProfile] = useState(null);
   const [active,  setActive]  = useState("overview");
+  
+  const [paying, setPaying] = useState(false);
+  const [monthFilter, setMonthFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
 
   // useFCM();
 
@@ -128,6 +132,98 @@ export default function TenantDashboard() {
     try { const d = await guestLogAPI.getMy(); setGLogs(d.logs ?? []); }
     catch (e) { setGError(e.message); } finally { setGLoading(false); }
   }, []);
+
+  const handleConfirmDone = async (requestId) => {
+    try {
+      await maintenanceAPI.confirmDone(requestId);
+      fetchMaintenance();
+    } catch (err) {
+      alert(err.message || "Failed to confirm. Please try again.");
+    }
+  };
+
+  const paymentList = payments.data?.payments ?? [];
+  const currentMonth = `${new Date().getFullYear()}-${String(
+    new Date().getMonth() + 1
+  ).padStart(2, "0")}`;
+  
+  const acceptedBookingLocal = (bookings.data?.bookings ?? []).find(b => b.status === "accepted");
+  const currentRoomId = (acceptedBookingLocal?.roomId?._id || acceptedBookingLocal?.roomId)?.toString();
+
+  const alreadyPaidForTestRoom = paymentList.some(
+    (p) =>
+      p.month === currentMonth &&
+      p.paymentStatus === "paid" &&
+      currentRoomId &&
+      (p.roomId?._id || p.roomId)?.toString() === currentRoomId
+  );
+
+  // After Stripe redirects back with ?payment=success&session_id=...,
+  // call verifySession to directly confirm payment with Stripe and update the DB.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const sessionId = params.get("session_id");
+    const paymentParam = params.get("payment");
+
+    if (paymentParam === "success" && sessionId) {
+      // Call backend to verify and mark as paid — no reliance on webhooks
+      paymentAPI.verifySession(sessionId)
+        .then(() => {
+          // Clean up the URL params
+          window.history.replaceState({}, "", "/tenant/dashboard?tab=payments");
+          // Refetch payments to show updated status
+          payments.refetch();
+        })
+        .catch((err) => {
+          console.error("verifySession error:", err.message);
+          // Still refetch in case webhook already handled it
+          payments.refetch();
+        });
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handlePayNow = async () => {
+    setPaying(true);
+    try {
+      // Always use the ACCEPTED booking, not just the first one
+      const activeBooking = (bookings.data?.bookings ?? []).find(
+        (b) => b.status === "accepted"
+      );
+      if (!activeBooking) {
+        alert("You must have an accepted booking to make a payment.");
+        setPaying(false);
+        return;
+      }
+
+      const res = await paymentAPI.createCheckoutSession({
+        roomId: activeBooking.roomId?._id || activeBooking.roomId,
+        propertyId: activeBooking.propertyId?._id || activeBooking.propertyId,
+        month: currentMonth,
+      });
+
+      if (res.url) {
+        window.location.href = res.url;
+      } else {
+        alert("Error fetching checkout url");
+      }
+    } catch (err) {
+      alert("Payment failed: " + err.message);
+    } finally {
+      setPaying(false);
+    }
+  };
+
+  const handleLeaveRoom = async (bookingId) => {
+    console.log("Leaving room:", bookingId);
+    try {
+      await bookingAPI.leave(bookingId);
+      window.location.reload();
+    } catch (err) {
+      console.error(err);
+      // Show the backend's specific message (e.g. unpaid rent)
+      alert(err.message || "Failed to leave room.");
+    }
+  };
 
   const fetchProperties = useCallback(async () => {
     try { const d = await propertyAPI.getAll(); setAllProperties(d.properties ?? []); }
@@ -283,12 +379,21 @@ export default function TenantDashboard() {
                         {fmtMoney(acceptedBooking.roomId?.rent)}/month · Booking accepted {fmtDate(acceptedBooking.resolvedAt)}
                       </p>
                     </div>
-                    <Link
-                      href={`/rooms/${acceptedBooking.propertyId?._id}`}
-                      className="btn btn-primary"
-                    >
-                      Manage Room
-                    </Link>
+                    <div style={{ display: "flex", gap: "0.5rem" }}>
+                      <button
+                        onClick={() => handleLeaveRoom(acceptedBooking._id)}
+                        className="btn btn-secondary"
+                        style={{ border: "1px solid var(--color-error-500)", color: "var(--color-error-600)" }}
+                      >
+                        Leave Room
+                      </button>
+                      <Link
+                        href={`/rooms/${acceptedBooking.propertyId?._id}`}
+                        className="btn btn-primary"
+                      >
+                        Manage Room
+                      </Link>
+                    </div>
                   </div>
                 ) : (
                   /* No accepted booking — prompt to search */
@@ -373,13 +478,103 @@ export default function TenantDashboard() {
         {/* ── My Payments ────────────────────────────────── */}
         {active === "payments" && (
           <div>
-            <h3 style={{ marginBottom: "1.5rem" }}>Payment history</h3>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: "1rem",
+                flexWrap: "wrap",
+                gap: "1rem",
+              }}
+            >
+              <h3>Payment history</h3>
+              <button
+                className="btn btn-primary btn-sm"
+                onClick={handlePayNow}
+                disabled={paying || alreadyPaidForTestRoom}
+                style={{
+                  opacity: paying || alreadyPaidForTestRoom ? 0.65 : 1,
+                  cursor: paying || alreadyPaidForTestRoom ? "not-allowed" : "pointer",
+                }}
+              >
+                {alreadyPaidForTestRoom
+                  ? "Already Paid"
+                  : paying
+                  ? "Redirecting..."
+                  : "Pay Now"}
+              </button>
+            </div>
+
+            <div
+              className="card"
+              style={{
+                marginBottom: "1rem",
+                display: "flex",
+                gap: "1rem",
+                flexWrap: "wrap",
+                alignItems: "end",
+              }}
+            >
+              <div>
+                <label
+                  style={{
+                    display: "block",
+                    fontSize: "0.85rem",
+                    marginBottom: "0.35rem",
+                    color: "var(--color-neutral-600)",
+                  }}
+                >
+                  Filter by month
+                </label>
+                <input
+                  type="month"
+                  value={monthFilter}
+                  onChange={(e) => setMonthFilter(e.target.value)}
+                  className="input"
+                />
+              </div>
+
+              <div>
+                <label
+                  style={{
+                    display: "block",
+                    fontSize: "0.85rem",
+                    marginBottom: "0.35rem",
+                    color: "var(--color-neutral-600)",
+                  }}
+                >
+                  Filter by status
+                </label>
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="input"
+                >
+                  <option value="">All</option>
+                  <option value="paid">Paid</option>
+                  <option value="pending">Pending</option>
+                  <option value="failed">Failed</option>
+                </select>
+              </div>
+
+              <button
+                className="btn btn-ghost"
+                onClick={() => {
+                  setMonthFilter("");
+                  setStatusFilter("");
+                }}
+              >
+                Reset filters
+              </button>
+            </div>
+
             <div className="card">
               {payments.loading ? <LoadingSpinner /> : payments.error ? <ErrorState message={payments.error} /> : (
                 <DataTable
                   headers={["Month", "Property", "Room", "Amount", "Status", "Paid on"]}
                   emptyMessage="No payments recorded yet."
-                  rows={(payments.data?.payments ?? []).map(p => [
+                  rows={paymentList.filter(p => (!monthFilter || p.month === monthFilter) && (!statusFilter || p.paymentStatus === statusFilter)).map(p => [
                     p.month ?? "—", p.propertyId?.title ?? "—", p.roomId?.label ?? "—",
                     fmtMoney(p.amount), p.paymentStatus, fmtDate(p.paidAt),
                   ])}
@@ -497,6 +692,9 @@ export default function TenantDashboard() {
                       <span style={{ fontWeight: "600", fontSize: "0.9375rem", color: "#111827" }}>{r.title}</span>
                       <Badge meta={MSTATUS_META[r.status] ?? MSTATUS_META.pending} />
                       <Badge meta={PRIORITY_META[r.priority] ?? PRIORITY_META.medium} />
+                      {r.tenantConfirmed && (
+                        <span style={{ fontSize: "0.75rem", color: "#15803d", fontWeight: "600" }}>✓ Confirmed by you</span>
+                      )}
                     </div>
                     <p style={{ margin: "0 0 0.5rem", fontSize: "0.875rem", color: "#6b7280" }}>{r.description}</p>
                     <div style={{ display: "flex", gap: "1rem", flexWrap: "wrap", fontSize: "0.8125rem", color: "#9ca3af" }}>
@@ -506,6 +704,25 @@ export default function TenantDashboard() {
                       <span>📅 {fmtDate(r.createdAt)}</span>
                       {r.technicianName && <span>🔧 {r.technicianName}</span>}
                     </div>
+                    {/* Show Mark as Done button if work has started but tenant hasn't confirmed yet */}
+                    {(r.status === "in_progress" || r.status === "resolved") && !r.tenantConfirmed && (
+                      <div style={{ marginTop: "0.75rem", paddingTop: "0.75rem", borderTop: "1px solid #f3f4f6" }}>
+                        <button
+                          onClick={() => handleConfirmDone(r._id)}
+                          style={{
+                            background: "#15803d", color: "#ffffff",
+                            border: "none", borderRadius: "8px",
+                            padding: "0.4rem 1rem", fontSize: "0.8125rem",
+                            fontWeight: "600", cursor: "pointer",
+                          }}
+                        >
+                          ✓ Mark as Done
+                        </button>
+                        <span style={{ marginLeft: "0.75rem", fontSize: "0.8rem", color: "#9ca3af" }}>
+                          Confirm the work has been completed to your satisfaction
+                        </span>
+                      </div>
+                    )}
                   </div>
                 ))
               }

@@ -8,13 +8,15 @@ import {
   getAllRequests,
   updateStatus,
   assignTechnician,
+  confirmDone,
 } from "../controllers/maintenanceController.js";
 
 const router = express.Router();
 
 // Tenant
-router.post("/",          auth, requireRole("tenant"),         createRequest);
-router.get("/my",         auth, requireRole("tenant"),         getMyRequests);
+router.post("/",              auth, requireRole("tenant"),         createRequest);
+router.get("/my",             auth, requireRole("tenant"),         getMyRequests);
+router.patch("/:id/confirm",  auth, requireRole("tenant"),         confirmDone);
 
 // Owner
 router.get("/property",   auth, requireRole("owner"),          getPropertyRequests);

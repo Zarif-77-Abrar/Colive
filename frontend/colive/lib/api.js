@@ -58,9 +58,11 @@ export const propertyAPI = {
 export const bookingAPI = {
   getMy:       ()     => request("/bookings/my"),
   getReceived: ()     => request("/bookings/received"),
-  create:      (body) => request("/bookings",              { method: "POST", body: JSON.stringify(body) }),
+  create:      (body) => request("/bookings",          { method: "POST",   body: JSON.stringify(body) }),
+  updateStatus:(id, s)=> request(`/bookings/${id}/status`, { method: "PATCH",  body: JSON.stringify({ status: s }) }),
   accept:      (id)   => request(`/bookings/${id}/accept`, { method: "PUT" }),
   reject:      (id)   => request(`/bookings/${id}/reject`, { method: "PUT" }),
+  leave:       (id)   => request(`/bookings/${id}/leave`,  { method: "PUT" }),
 };
 
 export const paymentAPI = {
@@ -71,12 +73,15 @@ export const paymentAPI = {
       method: "POST",
       body: JSON.stringify(body),
     }),
+  verifySession: (sessionId) =>
+    request(`/payments/verify-session?sessionId=${sessionId}`),
 };
 
 export const maintenanceAPI = {
   // Tenant
   getMy:          ()           => request("/maintenance/my"),
   create:         (body)       => request("/maintenance", { method: "POST", body: JSON.stringify(body) }),
+  confirmDone:    (id)         => request(`/maintenance/${id}/confirm`, { method: "PATCH" }),
 
   // Owner
   getProperty:    ()           => request("/maintenance/property"),

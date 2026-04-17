@@ -107,15 +107,17 @@ export default function RoomDetailPage() {
       try {
         // Fetch property which includes all its rooms
         const propData = await propertyAPI.getById(id);
+        const p = propData.property || propData;
+        
         // id here is the property id — we show all rooms of this property
-        setProperty(propData.property);
+        setProperty(p);
 
         // If tenant, also fetch compatibility for each room
         const u = getUser();
-        if (u?.role === "tenant" && propData.property.rooms?.length > 0) {
+        if (u?.role === "tenant" && p.rooms?.length > 0) {
           // Fetch compatibility for first available room by default
           // The user can switch between rooms
-          const firstRoom = propData.property.rooms[0];
+          const firstRoom = p.rooms[0];
           setRoom(firstRoom);
           try {
             const compData = await compatibilityAPI.getForRoom(firstRoom._id);
@@ -124,8 +126,8 @@ export default function RoomDetailPage() {
             // Tenant may not have preferences set
             setCompatibility(null);
           }
-        } else if (propData.property.rooms?.length > 0) {
-          setRoom(propData.property.rooms[0]);
+        } else if (p.rooms?.length > 0) {
+          setRoom(p.rooms[0]);
         }
       } catch (err) {
         setError(err.message);

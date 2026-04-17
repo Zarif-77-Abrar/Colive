@@ -162,3 +162,40 @@ export const assignTechnician = async (req, res) => {
     return res.status(500).json({ message: "Server error." });
   }
 };
+
+// ── PATCH /api/maintenance/:id/confirm ────────────────────
+// Tenant confirms the work is done → marks resolved
+export const confirmDone = async (req, res) => {
+  try {
+    const request = await MaintenanceRequest.findById(req.params.id);
+    if (!request) return res.status(404).json({ message: "Request not found." });
+
+    // Only the tenant who raised the request can confirm
+    if (request.createdBy.toString() !== req.user.id) {
+      return res.status(403).json({ message: "Only the tenant who raised this request can confirm it." });
+    }
+
+    if (request.status === "pending") {
+      return res.status(400).json({ message: "Cannot confirm a request that hasn't been worked on yet." });
+    }
+
+    if (request.tenantConfirmed) {
+      return res.status(400).json({ message: "You have already confirmed this request as done." });
+    }
+
+    request.tenantConfirmed   = true;
+    request.tenantConfirmedAt = new Date();
+    request.status            = "resolved";
+    request.resolvedAt        = request.resolvedAt || new Date();
+    await request.save();
+
+    const updated = await MaintenanceRequest.findById(request._id)
+      .populate("propertyId", "title city")
+      .populate("createdBy",  "name email");
+
+    return res.status(200).json({ message: "Marked as done. Thank you for confirming!", request: updated });
+  } catch (err) {
+    console.error("confirmDone error:", err.message);
+    return res.status(500).json({ message: "Server error." });
+  }
+};

@@ -69,7 +69,6 @@ export default function OwnerDashboard() {
   const [actionMsg,     setActionMsg]     = useState("");  
   const [monthFilter, setMonthFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
-  const [actionMsg,     setActionMsg]     = useState("");  
 
   // useFCM();
   const [othersSection, setOthersSection] = useState(null);
@@ -96,6 +95,8 @@ export default function OwnerDashboard() {
   const [gActionLoading, setGActionLoading] = useState(false);
   const [gActionError, setGActionError] = useState("");
   const [gSuccess, setGSuccess]         = useState("");
+
+  const currentMonth = useMemo(() => { const now = new Date(); return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`; }, []);
 
   useEffect(() => {
     const u = getUser();
@@ -184,7 +185,6 @@ export default function OwnerDashboard() {
   const gFiltered = gFilter === "all" ? gLogs : gLogs.filter(g => g.status === gFilter);
   const gCounts   = { all: gLogs.length, pending: gLogs.filter(g => g.status === "pending").length, approved: gLogs.filter(g => g.status === "approved").length, rejected: gLogs.filter(g => g.status === "rejected").length };
 
-  const currentMonth = useMemo(() => { const now = new Date(); return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`; }, []);
   const allOwnerPayments = allPaymentsRes.data?.payments ?? [];
   const filteredPayments = filteredPaymentsRes.data?.payments ?? [];
   const paymentsThisMonth = allOwnerPayments.filter((p) => p.month === currentMonth && p.paymentStatus === "paid").length;

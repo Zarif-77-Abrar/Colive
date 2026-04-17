@@ -18,7 +18,7 @@ import conversationRoutes   from "./routes/conversationRoutes.js";
 import { stripeWebhook }    from "./controllers/paymentController.js";
 
 dns.setServers(["1.1.1.1", "8.8.8.8"]);
-dotenv.config();
+dotenv.config({ override: true });
 
 const app = express();
 

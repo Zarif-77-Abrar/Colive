@@ -24,7 +24,7 @@ const bookingRequestSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ["pending", "accepted", "rejected", "withdrawn"],
+      enum: ["pending", "accepted", "rejected", "withdrawn", "left"],
       default: "pending",
     },
     message: {

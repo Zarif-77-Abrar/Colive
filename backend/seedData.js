@@ -46,6 +46,33 @@ const run = async () => {
         phone: "01711000002",
         university: SEED_TAG,
       },
+      {
+        name: "Kamal Hossain",
+        email: "owner3@colive.test",
+        passwordHash: await hash("Owner@1234"),
+        role: "owner",
+        gender: "male",
+        phone: "01711000003",
+        university: SEED_TAG,
+      },
+      {
+        name: "Abdul Kuddus",
+        email: "owner4@colive.test",
+        passwordHash: await hash("Owner@1234"),
+        role: "owner",
+        gender: "male",
+        phone: "01711000004",
+        university: SEED_TAG,
+      },
+      {
+        name: "Rahima Khatun",
+        email: "owner5@colive.test",
+        passwordHash: await hash("Owner@1234"),
+        role: "owner",
+        gender: "female",
+        phone: "01711000005",
+        university: SEED_TAG,
+      },
     ]);
     log(`✅ Created ${owners.length} owners`);
 
@@ -155,7 +182,80 @@ const run = async () => {
       rentRange:   { min: 0, max: 0 },
       availableRooms: 0,
     });
-    log(`\n✅ Created 2 properties`);
+    
+    const prop3 = await Property.create({
+      ownerId:     owners[2]._id,
+      title:       "Ocean Breeze Co-living",
+      description: `Premium coliving near the rail station. ${SEED_TAG}`,
+      address:     "11 Station Road, Rajshahi",
+      city:        "Rajshahi",
+      location:    { type: "Point", coordinates: [88.5999, 24.3688] },
+      amenities:   ["wifi", "water_heater", "security"],
+      rentRange:   { min: 0, max: 0 },
+      availableRooms: 0,
+    });
+
+    const prop4 = await Property.create({
+      ownerId:     owners[2]._id,
+      title:       "Student Haven",
+      description: `Dedicated student hostel at Talaimari. ${SEED_TAG}`,
+      address:     "Talaimari More, Rajshahi",
+      city:        "Rajshahi",
+      location:    { type: "Point", coordinates: [88.6045, 24.3750] },
+      amenities:   ["wifi", "common_kitchen", "parking", "security"],
+      rentRange:   { min: 0, max: 0 },
+      availableRooms: 0,
+    });
+
+    const prop5 = await Property.create({
+      ownerId:     owners[3]._id,
+      title:       "City Center Residences",
+      description: `Luxurious living space in the heart of the city. ${SEED_TAG}`,
+      address:     "Saheb Bazar, Rajshahi",
+      city:        "Rajshahi",
+      location:    { type: "Point", coordinates: [88.5950, 24.3660] },
+      amenities:   ["wifi", "generator", "water_heater", "gym", "security"],
+      rentRange:   { min: 0, max: 0 },
+      availableRooms: 0,
+    });
+
+    const prop6 = await Property.create({
+      ownerId:     owners[3]._id,
+      title:       "Royal Coliving Space",
+      description: `Spacious rooms with excellent view. ${SEED_TAG}`,
+      address:     "Bhadra, Rajshahi",
+      city:        "Rajshahi",
+      location:    { type: "Point", coordinates: [88.6180, 24.3760] },
+      amenities:   ["wifi", "parking", "security", "common_kitchen"],
+      rentRange:   { min: 0, max: 0 },
+      availableRooms: 0,
+    });
+
+    const prop7 = await Property.create({
+      ownerId:     owners[4]._id,
+      title:       "Elite Student Housing",
+      description: `Perfect for students, quiet environment. ${SEED_TAG}`,
+      address:     "Motihar, Rajshahi",
+      city:        "Rajshahi",
+      location:    { type: "Point", coordinates: [88.6250, 24.3700] },
+      amenities:   ["wifi", "study_room", "common_kitchen", "security"],
+      rentRange:   { min: 0, max: 0 },
+      availableRooms: 0,
+    });
+
+    const prop8 = await Property.create({
+      ownerId:     owners[4]._id,
+      title:       "Comfort Zone Hostel",
+      description: `Affordable and comfortable living. ${SEED_TAG}`,
+      address:     "Kazla, Rajshahi",
+      city:        "Rajshahi",
+      location:    { type: "Point", coordinates: [88.6100, 24.3720] },
+      amenities:   ["wifi", "generator", "security"],
+      rentRange:   { min: 0, max: 0 },
+      availableRooms: 0,
+    });
+    
+    log(`\n✅ Created 8 properties`);
 
     // ── Create rooms ───────────────────────────────────────
     // Property 1:
@@ -214,7 +314,37 @@ const run = async () => {
       },
     ]);
 
-    log(`✅ Created 6 rooms`);
+    await Room.insertMany([
+      { propertyId: prop3._id, label: "Room X", rent: 6000, capacity: 1, currentTenants: [] },
+      { propertyId: prop3._id, label: "Room Y", rent: 4000, capacity: 2, currentTenants: [] },
+    ]);
+    
+    await Room.insertMany([
+      { propertyId: prop4._id, label: "Room 101", rent: 2500, capacity: 4, currentTenants: [] },
+      { propertyId: prop4._id, label: "Room 102", rent: 3000, capacity: 3, currentTenants: [] },
+    ]);
+
+    // Property 5: 8 rooms
+    await Room.insertMany(Array.from({ length: 8 }).map((_, i) => ({
+      propertyId: prop5._id, label: `Room ${501 + i}`, rent: 4000 + (i * 200), capacity: (i % 2 === 0) ? 2 : 1, currentTenants: []
+    })));
+
+    // Property 6: 6 rooms
+    await Room.insertMany(Array.from({ length: 6 }).map((_, i) => ({
+      propertyId: prop6._id, label: `Suite ${i + 1}`, rent: 6000 + (i * 500), capacity: 1, currentTenants: []
+    })));
+
+    // Property 7: 10 rooms
+    await Room.insertMany(Array.from({ length: 10 }).map((_, i) => ({
+      propertyId: prop7._id, label: `Block A-${i + 1}`, rent: 2500 + (i * 100), capacity: 3, currentTenants: []
+    })));
+
+    // Property 8: 12 rooms
+    await Room.insertMany(Array.from({ length: 12 }).map((_, i) => ({
+      propertyId: prop8._id, label: `Dorm ${i + 1}`, rent: 2000, capacity: 4, currentTenants: []
+    })));
+
+    log(`✅ Created 46 rooms`);
 
     // ── Sync all room statuses ─────────────────────────────
     // This recalculates status from currentTenants vs capacity
@@ -239,6 +369,16 @@ const run = async () => {
     log("    Room 1 — 2/2 tenants → occupied");
     log("    Room 2 — 1/2 tenants → available");
     log("    Room 3 — 0/3 tenants → available");
+    log("  Ocean Breeze Co-living");
+    log("    Room X — 0/1 tenants → available");
+    log("    Room Y — 0/2 tenants → available");
+    log("  Student Haven");
+    log("    Room 101 — 0/4 tenants → available");
+    log("    Room 102 — 0/3 tenants → available");
+    log("  City Center Residences — 8 rooms available");
+    log("  Royal Coliving Space — 6 rooms available");
+    log("  Elite Student Housing — 10 rooms available");
+    log("  Comfort Zone Hostel — 12 rooms available");
     log("\n✅ Seed complete.");
 
   } catch (err) {
