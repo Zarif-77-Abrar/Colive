@@ -1,9 +1,8 @@
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL;
 
 const request = async (endpoint, options = {}) => {
-  const token = typeof window !== "undefined"
-    ? localStorage.getItem("token")
-    : null;
+  const token =
+    typeof window !== "undefined" ? localStorage.getItem("token") : null;
 
   const config = {
     headers: {
@@ -14,7 +13,7 @@ const request = async (endpoint, options = {}) => {
     ...options,
   };
 
-  const res  = await fetch(`${BASE_URL}${endpoint}`, config);
+  const res = await fetch(`${BASE_URL}${endpoint}`, config);
   const data = await res.json();
 
   if (!res.ok) {
@@ -29,9 +28,17 @@ const request = async (endpoint, options = {}) => {
 };
 
 export const authAPI = {
-  register: (body) => request("/auth/register", { method: "POST", body: JSON.stringify(body) }),
-  login:    (body) => request("/auth/login",    { method: "POST", body: JSON.stringify(body) }),
-  getMe:    ()     => request("/auth/me"),
+  register: (body) =>
+    request("/auth/register", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  login: (body) =>
+    request("/auth/login", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  getMe: () => request("/auth/me"),
 };
 
 export const userAPI = {
@@ -43,9 +50,9 @@ export const userAPI = {
 };
 
 export const propertyAPI = {
-  getAll:  (query = "") => request(`/properties${query}`),
-  getById: (id)         => request(`/properties/${id}`),
-  getMy:   ()           => request("/properties/my"),
+  getAll: (query = "") => request(`/properties${query}`),
+  getById: (id) => request(`/properties/${id}`),
+  getMy: () => request("/properties/my"),
 };
 
 export const bookingAPI = {
@@ -57,8 +64,13 @@ export const bookingAPI = {
 };
 
 export const paymentAPI = {
-  getMy:       () => request("/payments/my"),
-  getProperty: () => request("/payments/property"),
+  getMy: (query = "") => request(`/payments/my${query}`),
+  getProperty: (query = "") => request(`/payments/property${query}`),
+  createCheckoutSession: (body) =>
+    request("/payments/create-checkout-session", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
 };
 
 export const maintenanceAPI = {

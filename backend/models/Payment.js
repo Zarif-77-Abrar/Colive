@@ -17,25 +17,49 @@ const paymentSchema = new mongoose.Schema(
       ref: "Property",
       required: true,
     },
+
     amount: {
       type: Number,
       required: true,
       min: 0,
     },
+
     month: {
       type: String,
-      required: true, // e.g. "2025-03"
-      trim: true,
+      required: true, // YYYY-MM
     },
+
     paymentStatus: {
       type: String,
-      enum: ["pending", "paid", "failed", "refunded"],
+      enum: ["pending", "paid", "failed"],
       default: "pending",
     },
+
     stripeSessionId: {
       type: String,
-      trim: true,
+      default: null,
     },
+
+    stripeTransactionId: {
+      type: String,
+      default: null,
+    },
+
+    stripePaymentIntentId: {
+      type: String,
+      default: null,
+    },
+
+    currency: {
+      type: String,
+      default: "BDT",
+    },
+
+    paymentMethod: {
+      type: String,
+      default: "card",
+    },
+
     paidAt: {
       type: Date,
       default: null,
@@ -44,7 +68,10 @@ const paymentSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-paymentSchema.index({ tenantId: 1, month: 1 });
+paymentSchema.index(
+  { tenantId: 1, roomId: 1, propertyId: 1, month: 1 },
+  { unique: false }
+);
 
 const Payment = mongoose.model("Payment", paymentSchema);
 export default Payment;

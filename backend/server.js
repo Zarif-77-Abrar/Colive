@@ -11,10 +11,11 @@ import propertyRoutes       from "./routes/propertyRoutes.js";
 import bookingRoutes        from "./routes/bookingRoutes.js";
 import paymentRoutes        from "./routes/paymentRoutes.js";
 import maintenanceRoutes    from "./routes/maintenanceRoutes.js";
-import guestLogRoutes    from "./routes/guestLogRoutes.js";
+import guestLogRoutes       from "./routes/guestLogRoutes.js";
 import noticeRoutes         from "./routes/noticeRoutes.js";
 import compatibilityRoutes  from "./routes/compatibilityRoutes.js";
 import conversationRoutes   from "./routes/conversationRoutes.js";
+import { stripeWebhook }    from "./controllers/paymentController.js";
 
 dns.setServers(["1.1.1.1", "8.8.8.8"]);
 dotenv.config();
@@ -22,6 +23,14 @@ dotenv.config();
 const app = express();
 
 app.use(cors({ origin: "http://localhost:3000", credentials: true }));
+
+// Stripe webhook must come before express.json()
+app.post(
+  "/api/payments/webhook",
+  express.raw({ type: "application/json" }),
+  stripeWebhook
+);
+
 app.use(express.json());
 
 connectDB();
@@ -34,10 +43,10 @@ app.use("/api/properties",    propertyRoutes);
 app.use("/api/bookings",      bookingRoutes);
 app.use("/api/payments",      paymentRoutes);
 app.use("/api/maintenance",   maintenanceRoutes);
-app.use("/api/guests",      guestLogRoutes);
+app.use("/api/guests",        guestLogRoutes);
 app.use("/api/notices",       noticeRoutes);
-app.use("/api/compatibility",  compatibilityRoutes);
-app.use("/api/conversations",  conversationRoutes);
+app.use("/api/compatibility", compatibilityRoutes);
+app.use("/api/conversations", conversationRoutes);
 
 app.get("/api/health", (req, res) => res.json({ status: "CoLive API running" }));
 

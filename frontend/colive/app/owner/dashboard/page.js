@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Navbar from "../../../components/Navbar";
@@ -9,7 +9,7 @@ import StatCard from "../../../components/StatCard";
 import DataTable from "../../../components/DataTable";
 import { LoadingSpinner, ErrorState } from "../../../components/LoadingState";
 import useApi from "../../../lib/useApi";
-import { getUser, propertyAPI, bookingAPI, maintenanceAPI, noticeAPI, guestLogAPI } from "../../../lib/api";
+import { getUser, propertyAPI, bookingAPI, maintenanceAPI, noticeAPI, guestLogAPI, paymentAPI } from "../../../lib/api";
 import useFCM from "../../../lib/useFCM";
 
 const TABS = [
@@ -18,6 +18,7 @@ const TABS = [
   { key: "bookings",    label: "Bookings"       },
   { key: "maintenance", label: "Maintenance"    },
   { key: "notices",     label: "Notices"        },
+  { key: "payments",    label: "Payments"       },
   { key: "messages",    label: "Messages"       },
   { key: "others",      label: "Others"        },
 ];
@@ -65,6 +66,9 @@ export default function OwnerDashboard() {
   const [user, setUser]   = useState(null);
   const [active, setActive] = useState("overview");
   const [actionLoading, setActionLoading] = useState(null);
+  const [actionMsg,     setActionMsg]     = useState("");  
+  const [monthFilter, setMonthFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
   const [actionMsg,     setActionMsg]     = useState("");  
 
   // useFCM();
@@ -118,6 +122,9 @@ export default function OwnerDashboard() {
   const properties = useApi(propertyAPI.getMy);
   const bookings   = useApi(bookingAPI.getReceived);
   const notices    = useApi(noticeAPI.getMy);
+
+  const allPaymentsRes = useApi(() => paymentAPI.getProperty(""));
+  const filteredPaymentsRes = useApi(() => paymentAPI.getProperty(`?month=${encodeURIComponent(monthFilter)}&status=${encodeURIComponent(statusFilter)}`), [monthFilter, statusFilter]);
 
   const fetchMaintenance = useCallback(async () => {
     setMLoading(true); setMError("");
@@ -177,6 +184,12 @@ export default function OwnerDashboard() {
   const gFiltered = gFilter === "all" ? gLogs : gLogs.filter(g => g.status === gFilter);
   const gCounts   = { all: gLogs.length, pending: gLogs.filter(g => g.status === "pending").length, approved: gLogs.filter(g => g.status === "approved").length, rejected: gLogs.filter(g => g.status === "rejected").length };
 
+  const currentMonth = useMemo(() => { const now = new Date(); return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`; }, []);
+  const allOwnerPayments = allPaymentsRes.data?.payments ?? [];
+  const filteredPayments = filteredPaymentsRes.data?.payments ?? [];
+  const paymentsThisMonth = allOwnerPayments.filter((p) => p.month === currentMonth && p.paymentStatus === "paid").length;
+  const totalCollected = allOwnerPayments.filter((p) => p.paymentStatus === "paid").reduce((sum, p) => sum + (p.amount ?? 0), 0);
+
   return (
     <div style={{ minHeight: "100vh", background: "var(--color-neutral-50)" }}>
       <Navbar />
@@ -194,6 +207,8 @@ export default function OwnerDashboard() {
               <StatCard label="Available rooms"  value={availableRooms}               sub="across all properties"           accent="success" />
               <StatCard label="Pending bookings" value={pendingBookings}              sub="awaiting your response"           accent="warning" />
               <StatCard label="Open maintenance" value={openMaintenance}              sub="unresolved requests"              accent="error"   />
+              <StatCard label="Payments this month" value={paymentsThisMonth} sub="successful payments" accent="success" />
+              <StatCard label="Total collected" value={fmtMoney(totalCollected)} sub="from paid rent records" accent="primary" />
             </div>
             <div className="card" style={{ marginBottom: "1.5rem" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
@@ -445,6 +460,40 @@ export default function OwnerDashboard() {
                 </div>
               )
             }
+          </div>
+        )}
+
+        {/* ── Payments ──────────────────────────────────────── */}
+        {active === "payments" && (
+          <div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem", flexWrap: "wrap", gap: "1rem" }}>
+              <h3>Rent payment tracking</h3>
+            </div>
+            <div className="card" style={{ marginBottom: "1rem", display: "flex", gap: "1rem", flexWrap: "wrap", alignItems: "end" }}>
+              <div>
+                <label style={{ display: "block", fontSize: "0.85rem", marginBottom: "0.35rem", color: "var(--color-neutral-600)" }}>Filter by month</label>
+                <input type="month" value={monthFilter} onChange={(e) => setMonthFilter(e.target.value)} className="input" />
+              </div>
+              <div>
+                <label style={{ display: "block", fontSize: "0.85rem", marginBottom: "0.35rem", color: "var(--color-neutral-600)" }}>Filter by status</label>
+                <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="input">
+                  <option value="">All</option>
+                  <option value="paid">Paid</option>
+                  <option value="pending">Pending</option>
+                  <option value="failed">Failed</option>
+                </select>
+              </div>
+              <button className="btn btn-ghost" onClick={() => { setMonthFilter(""); setStatusFilter(""); }}>Reset filters</button>
+            </div>
+            <div className="card">
+              {filteredPaymentsRes.loading ? <LoadingSpinner /> : filteredPaymentsRes.error ? <ErrorState message={filteredPaymentsRes.error} /> : (
+                <DataTable headers={["Tenant", "Email", "Property", "Room", "Amount", "Month", "Status", "Paid on"]} emptyMessage="No payment records found."
+                  rows={filteredPayments.map((p) => [
+                    p.tenantId?.name ?? "—", p.tenantId?.email ?? "—", p.propertyId?.title ?? "—", p.roomId?.label ?? "—",
+                    fmtMoney(p.amount), p.month ?? "—", p.paymentStatus, fmtDate(p.paidAt),
+                  ])} />
+              )}
+            </div>
           </div>
         )}
 
