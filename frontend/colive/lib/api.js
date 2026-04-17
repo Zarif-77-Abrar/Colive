@@ -77,6 +77,35 @@ export const paymentAPI = {
     request(`/payments/verify-session?sessionId=${sessionId}`),
 };
 
+export const utilityBillAPI = {
+  // Owner
+  createOrUpdate: (body)  => request("/bills", { method: "POST", body: JSON.stringify(body) }),
+  getProperty:    ()      => request("/bills/property"),
+  // Tenant
+  getMy:          ()      => request("/bills/my"),
+  markPaid:       (id)    => request(`/bills/splits/${id}/pay`, { method: "PATCH" }),
+};
+
+export const agreementAPI = {
+  getMy:       ()   => request("/agreements/my"),
+  getProperty: ()   => request("/agreements/property"),
+  // Returns a PDF blob — handled separately with raw fetch
+  download: async (bookingId) => {
+    const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+    const res = await fetch(`${BASE_URL}/agreements/generate/${bookingId}`, {
+      method: "POST",
+      headers: { ...(token && { Authorization: `Bearer ${token}` }) },
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ message: "Failed to generate agreement." }));
+      throw new Error(err.message);
+    }
+    const data = await res.json();
+    return data.pdfBase64;
+  },
+};
+
+
 export const maintenanceAPI = {
   // Tenant
   getMy:          ()           => request("/maintenance/my"),

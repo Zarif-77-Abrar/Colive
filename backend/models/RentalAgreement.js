@@ -35,6 +35,16 @@ const rentalAgreementSchema = new mongoose.Schema(
       required: true,
       min: 0,
     },
+    bookingId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "BookingRequest",
+      default: null,
+    },
+    status: {
+      type: String,
+      enum: ["draft", "active"],
+      default: "active",
+    },
     agreementPdfUrl: {
       type: String,
       trim: true,

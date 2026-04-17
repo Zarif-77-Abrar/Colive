@@ -9,7 +9,7 @@ import StatCard from "../../../components/StatCard";
 import DataTable from "../../../components/DataTable";
 import { LoadingSpinner, ErrorState } from "../../../components/LoadingState";
 import useApi from "../../../lib/useApi";
-import { getUser, propertyAPI, bookingAPI, maintenanceAPI, noticeAPI, guestLogAPI, paymentAPI } from "../../../lib/api";
+import { getUser, propertyAPI, bookingAPI, maintenanceAPI, noticeAPI, guestLogAPI, paymentAPI, utilityBillAPI, agreementAPI } from "../../../lib/api";
 import useFCM from "../../../lib/useFCM";
 
 const TABS = [
@@ -96,7 +96,16 @@ export default function OwnerDashboard() {
   const [gActionError, setGActionError] = useState("");
   const [gSuccess, setGSuccess]         = useState("");
 
+  // Utility bill state
+  const [propertyBills,  setPropertyBills]  = useState([]);
+  const [billFormLoading, setBillFormLoading] = useState(false);
+  const [billFormSuccess, setBillFormSuccess] = useState("");
+  const [billFormError,   setBillFormError]   = useState("");
+
   const currentMonth = useMemo(() => { const now = new Date(); return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`; }, []);
+
+  const EMPTY_BILL = useMemo(() => ({ propertyId: "", month: currentMonth, electricity: "", water: "", gas: "", internet: "" }), [currentMonth]);
+  const [billForm, setBillForm] = useState({ propertyId: "", month: "", electricity: "", water: "", gas: "", internet: "" });
 
   useEffect(() => {
     const u = getUser();
@@ -139,9 +148,59 @@ export default function OwnerDashboard() {
     catch (e) { setGError(e.message); } finally { setGLoading(false); }
   }, []);
 
+  const fetchPropertyBills = useCallback(async () => {
+    try { const d = await utilityBillAPI.getProperty(); setPropertyBills(d.bills ?? []); }
+    catch (e) { console.error(e.message); }
+  }, []);
+
+  const handleBillSubmit = async (e) => {
+    e.preventDefault();
+    setBillFormLoading(true); setBillFormError(""); setBillFormSuccess("");
+    try {
+      await utilityBillAPI.createOrUpdate({
+        propertyId:  billForm.propertyId,
+        month:       billForm.month,
+        electricity: Number(billForm.electricity) || 0,
+        water:       Number(billForm.water)       || 0,
+        gas:         Number(billForm.gas)         || 0,
+        internet:    Number(billForm.internet)    || 0,
+      });
+      setBillFormSuccess("Bill saved and split among tenants.");
+      setBillForm(EMPTY_BILL);
+      fetchPropertyBills();
+      setTimeout(() => setBillFormSuccess(""), 4000);
+    } catch (err) {
+      setBillFormError(err.message);
+    } finally {
+      setBillFormLoading(false);
+    }
+  };
+
+  const handleDownloadAgreement = async (bookingId) => {
+    try {
+      const base64 = await agreementAPI.download(bookingId);
+      const binaryString = window.atob(base64);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      const blob = new Blob([bytes], { type: "application/pdf" });
+      const url  = URL.createObjectURL(blob);
+      window.open(url, "_blank");
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
+    } catch (err) {
+      alert("Could not generate agreement: " + err.message);
+    }
+  };
+
   useEffect(() => {
-    if (user) { fetchMaintenance(); fetchGuestLogs(); }
-  }, [user, fetchMaintenance, fetchGuestLogs]);
+    if (user) { fetchMaintenance(); fetchGuestLogs(); fetchPropertyBills(); }
+  }, [user, fetchMaintenance, fetchGuestLogs, fetchPropertyBills]);
+
+  // Sync month field once currentMonth is ready
+  useEffect(() => {
+    setBillForm(prev => prev.month ? prev : { ...prev, month: currentMonth });
+  }, [currentMonth]);
 
   // Maintenance handlers
   const openMActionCard = (r) => {
@@ -318,7 +377,15 @@ export default function OwnerDashboard() {
                           </p>
                         )}
                       </div>
-                      <div style={{ display: "flex", alignItems: "center", gap: "0.625rem" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.625rem", flexWrap: "wrap" }}>
+                        {b.status === "accepted" && (
+                          <button
+                            onClick={() => handleDownloadAgreement(b._id)}
+                            style={{ background: "#1a3c5e", color: "#fff", border: "none", borderRadius: "8px", padding: "0.45rem 1rem", fontWeight: "600", fontSize: "0.8rem", cursor: "pointer", whiteSpace: "nowrap" }}
+                          >
+                            📄 Agreement
+                          </button>
+                        )}
                         {b.status === "pending" ? (
                           <>
                             <button
@@ -528,6 +595,11 @@ export default function OwnerDashboard() {
                     <div style={{ fontWeight: "700", fontSize: "1rem", color: "#111827", marginBottom: "0.375rem" }}>Guest Entry Log</div>
                     <div style={{ fontSize: "0.8125rem", color: "#6b7280", lineHeight: "1.5" }}>Review and approve guest visits for your properties.</div>
                   </button>
+                  <button onClick={() => { setOthersSection("bills"); fetchPropertyBills(); }} style={hubBtnStyle}>
+                    <div style={{ fontSize: "2rem", marginBottom: "0.75rem" }}>⚡</div>
+                    <div style={{ fontWeight: "700", fontSize: "1rem", color: "#111827", marginBottom: "0.375rem" }}>Utility Bills</div>
+                    <div style={{ fontSize: "0.8125rem", color: "#6b7280", lineHeight: "1.5" }}>Post monthly bills — auto-split among tenants.</div>
+                  </button>
                   <div style={{ ...hubBtnStyle, opacity: 0.5, cursor: "not-allowed" }}>
                     <div style={{ fontSize: "2rem", marginBottom: "0.75rem" }}>🍽️</div>
                     <div style={{ fontWeight: "700", fontSize: "1rem", color: "#111827", marginBottom: "0.375rem" }}>Daily Meal</div>
@@ -616,6 +688,93 @@ export default function OwnerDashboard() {
                     ))
                   }
                 </div>
+              </div>
+            )}
+
+            {/* ── Utility Bills ─────────────────────────── */}
+            {othersSection === "bills" && (
+              <div>
+                <div style={{ display: "flex", alignItems: "center", gap: "0.875rem", marginBottom: "1.5rem" }}>
+                  <button onClick={() => setOthersSection(null)}
+                    style={{ background: "#f3f4f6", border: "none", borderRadius: "8px", padding: "0.4rem 0.875rem", fontSize: "0.8125rem", fontWeight: "600", color: "#374151", cursor: "pointer" }}>
+                    ← Back
+                  </button>
+                  <div>
+                    <h3 style={{ margin: 0 }}>Utility Bills</h3>
+                    <p style={{ color: "var(--color-neutral-500)", fontSize: "0.875rem", marginTop: "0.125rem" }}>Enter monthly bills — they&apos;ll be split equally among all tenants.</p>
+                  </div>
+                </div>
+
+                {/* Bill entry form */}
+                <div className="card" style={{ marginBottom: "1.5rem" }}>
+                  <h4 style={{ marginBottom: "1.25rem" }}>Post a Utility Bill</h4>
+                  {billFormError   && <div style={{ background: "#fef2f2", border: "1px solid #fca5a5", borderRadius: "8px", padding: "0.75rem 1rem", marginBottom: "1rem", color: "#dc2626", fontSize: "0.875rem" }}>{billFormError}</div>}
+                  {billFormSuccess && <div style={successBannerStyle}>✓ {billFormSuccess}</div>}
+                  <form onSubmit={handleBillSubmit}>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "1rem" }}>
+                      <div>
+                        <label style={panelLabelStyle}>Property *</label>
+                        <select value={billForm.propertyId} onChange={e => setBillForm({ ...billForm, propertyId: e.target.value })} style={selectStyle} required>
+                          <option value="">Select property…</option>
+                          {(properties.data?.properties ?? []).map(p => (
+                            <option key={p._id} value={p._id}>{p.title}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label style={panelLabelStyle}>Month *</label>
+                        <input type="month" value={billForm.month} onChange={e => setBillForm({ ...billForm, month: e.target.value })} style={selectStyle} required />
+                      </div>
+                      <div>
+                        <label style={panelLabelStyle}>Electricity (BDT)</label>
+                        <input type="number" min="0" value={billForm.electricity} onChange={e => setBillForm({ ...billForm, electricity: e.target.value })} placeholder="0" style={selectStyle} />
+                      </div>
+                      <div>
+                        <label style={panelLabelStyle}>Water (BDT)</label>
+                        <input type="number" min="0" value={billForm.water} onChange={e => setBillForm({ ...billForm, water: e.target.value })} placeholder="0" style={selectStyle} />
+                      </div>
+                      <div>
+                        <label style={panelLabelStyle}>Gas (BDT)</label>
+                        <input type="number" min="0" value={billForm.gas} onChange={e => setBillForm({ ...billForm, gas: e.target.value })} placeholder="0" style={selectStyle} />
+                      </div>
+                      <div>
+                        <label style={panelLabelStyle}>Internet (BDT)</label>
+                        <input type="number" min="0" value={billForm.internet} onChange={e => setBillForm({ ...billForm, internet: e.target.value })} placeholder="0" style={selectStyle} />
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                      <button type="submit" disabled={billFormLoading} style={{ ...saveBtnStyle, opacity: billFormLoading ? 0.6 : 1 }}>
+                        {billFormLoading ? "Saving..." : "Post Bill & Split"}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+
+                {/* Past bills table */}
+                <h4 style={{ marginBottom: "1rem" }}>Past Bills</h4>
+                {propertyBills.length === 0 ? (
+                  <div className="card" style={{ textAlign: "center", padding: "2rem", color: "var(--color-neutral-400)" }}>No bills posted yet.</div>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+                    {propertyBills.map(b => (
+                      <div key={b._id} className="card" style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: "1rem", alignItems: "center" }}>
+                        <div>
+                          <div style={{ fontWeight: "600", marginBottom: "0.25rem" }}>{b.propertyId?.title ?? "—"} — {b.month}</div>
+                          <div style={{ display: "flex", gap: "1rem", flexWrap: "wrap", fontSize: "0.8125rem", color: "#6b7280" }}>
+                            {b.electricity > 0 && <span>⚡ BDT {b.electricity.toLocaleString()}</span>}
+                            {b.water       > 0 && <span>💧 BDT {b.water.toLocaleString()}</span>}
+                            {b.gas         > 0 && <span>🔥 BDT {b.gas.toLocaleString()}</span>}
+                            {b.internet    > 0 && <span>🌐 BDT {b.internet.toLocaleString()}</span>}
+                          </div>
+                        </div>
+                        <div style={{ textAlign: "right" }}>
+                          <div style={{ fontWeight: "700", color: "#111827" }}>Total: BDT {b.total?.toLocaleString()}</div>
+                          <div style={{ fontSize: "0.8rem", color: "#9ca3af", marginTop: "0.2rem" }}>Posted {fmtDate(b.createdAt)}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </div>

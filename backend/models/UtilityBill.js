@@ -15,6 +15,7 @@ const utilityBillSchema = new mongoose.Schema(
     electricity: { type: Number, default: 0, min: 0 },
     water:       { type: Number, default: 0, min: 0 },
     gas:         { type: Number, default: 0, min: 0 },
+    internet:    { type: Number, default: 0, min: 0 },
     total:       { type: Number, default: 0, min: 0 },
   },
   { timestamps: true }

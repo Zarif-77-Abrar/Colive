@@ -10,7 +10,7 @@ import DataTable from "../../../components/DataTable";
 import { LoadingSpinner, ErrorState } from "../../../components/LoadingState";
 import useApi from "../../../lib/useApi";
 import useFCM from "../../../lib/useFCM";
-import { getUser, bookingAPI, paymentAPI, maintenanceAPI, userAPI, propertyAPI, guestLogAPI } from "../../../lib/api";
+import { getUser, bookingAPI, paymentAPI, maintenanceAPI, userAPI, propertyAPI, guestLogAPI, utilityBillAPI, agreementAPI } from "../../../lib/api";
 
 const TABS = [
   { key: "overview",    label: "Overview"    },
@@ -142,6 +142,46 @@ export default function TenantDashboard() {
     }
   };
 
+  // Utility Bills state
+  const [billSplits,    setBillSplits]    = useState([]);
+  const [billLoading,   setBillLoading]   = useState(false);
+  const [billError,     setBillError]     = useState("");
+  const [billSuccess,   setBillSuccess]   = useState("");
+
+  const fetchBillSplits = useCallback(async () => {
+    setBillLoading(true); setBillError("");
+    try { const d = await utilityBillAPI.getMy(); setBillSplits(d.splits ?? []); }
+    catch (e) { setBillError(e.message); } finally { setBillLoading(false); }
+  }, []);
+
+  const handleMarkBillPaid = async (splitId) => {
+    try {
+      await utilityBillAPI.markPaid(splitId);
+      setBillSuccess("Marked as paid!");
+      fetchBillSplits();
+      setTimeout(() => setBillSuccess(""), 3000);
+    } catch (err) {
+      alert(err.message || "Failed to mark as paid.");
+    }
+  };
+
+  const handleDownloadAgreement = async (bookingId) => {
+    try {
+      const base64 = await agreementAPI.download(bookingId);
+      const binaryString = window.atob(base64);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      const blob = new Blob([bytes], { type: "application/pdf" });
+      const url  = URL.createObjectURL(blob);
+      window.open(url, "_blank");
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
+    } catch (err) {
+      alert("Could not generate agreement: " + err.message);
+    }
+  };
+
   const paymentList = payments.data?.payments ?? [];
   const currentMonth = `${new Date().getFullYear()}-${String(
     new Date().getMonth() + 1
@@ -231,8 +271,8 @@ export default function TenantDashboard() {
   }, []);
 
   useEffect(() => {
-    if (user) { fetchMaintenance(); fetchProperties(); fetchGuestLogs(); }
-  }, [user, fetchMaintenance, fetchProperties, fetchGuestLogs]);
+    if (user) { fetchMaintenance(); fetchProperties(); fetchGuestLogs(); fetchBillSplits(); }
+  }, [user, fetchMaintenance, fetchProperties, fetchGuestLogs, fetchBillSplits]);
 
   // ── Maintenance property search ────────────────────────
   const handlePropertySearch = (e) => {
@@ -459,19 +499,68 @@ export default function TenantDashboard() {
         {active === "bookings" && (
           <div>
             <h3 style={{ marginBottom: "1.5rem" }}>My booking requests</h3>
-            <div className="card">
-              {bookings.loading ? <LoadingSpinner /> : bookings.error ? <ErrorState message={bookings.error} /> : (
-                <DataTable
-                  headers={["Property", "Room", "Rent/mo", "Compatibility", "Status", "Requested"]}
-                  emptyMessage="You have not made any booking requests yet."
-                  rows={(bookings.data?.bookings ?? []).map(b => [
-                    b.propertyId?.title ?? "—", b.roomId?.label ?? "—", fmtMoney(b.roomId?.rent),
-                    b.compatibilityScore != null ? `${b.compatibilityScore}%` : "—",
-                    b.status, fmtDate(b.createdAt),
-                  ])}
-                />
-              )}
-            </div>
+            {bookings.loading ? <LoadingSpinner /> : bookings.error ? <ErrorState message={bookings.error} /> :
+              (bookings.data?.bookings ?? []).length === 0 ? (
+                <div className="card" style={{ textAlign: "center", padding: "3rem", color: "var(--color-neutral-400)" }}>
+                  You have not made any booking requests yet.
+                </div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+                  {(bookings.data?.bookings ?? []).map(b => {
+                    const statusColors = {
+                      accepted: { color: "#15803d", bg: "#dcfce7" },
+                      pending:  { color: "#b45309", bg: "#fef3c7" },
+                      rejected: { color: "#dc2626", bg: "#fee2e2" },
+                      left:     { color: "#6b7280", bg: "#f3f4f6" },
+                    };
+                    const meta = statusColors[b.status] ?? statusColors.pending;
+                    return (
+                      <div key={b._id} className="card">
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "1rem" }}>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: "0.625rem", flexWrap: "wrap", marginBottom: "0.375rem" }}>
+                              <span style={{ fontWeight: "600", fontSize: "0.9375rem", color: "#111827" }}>
+                                {b.propertyId?.title ?? "—"} — {b.roomId?.label ?? "—"}
+                              </span>
+                              <span style={{ display: "inline-block", padding: "0.2rem 0.6rem", borderRadius: "999px", fontSize: "0.75rem", fontWeight: "600", color: meta.color, background: meta.bg }}>
+                                {b.status}
+                              </span>
+                            </div>
+                            <div style={{ display: "flex", gap: "1.25rem", flexWrap: "wrap", fontSize: "0.8125rem", color: "#9ca3af" }}>
+                              <span>💰 {fmtMoney(b.roomId?.rent)}/month</span>
+                              {b.compatibilityScore != null && <span>🎯 {b.compatibilityScore}% compatibility</span>}
+                              <span>📅 Requested {fmtDate(b.createdAt)}</span>
+                              {b.resolvedAt && <span>✓ Resolved {fmtDate(b.resolvedAt)}</span>}
+                            </div>
+                            {b.message && (
+                              <p style={{ fontSize: "0.8125rem", color: "#6b7280", marginTop: "0.35rem", fontStyle: "italic" }}>
+                                &ldquo;{b.message}&rdquo;
+                              </p>
+                            )}
+                          </div>
+                          {/* Download Agreement — only for accepted bookings */}
+                          {b.status === "accepted" && (
+                            <button
+                              onClick={() => handleDownloadAgreement(b._id)}
+                              style={{
+                                background: "#1a3c5e", color: "#fff",
+                                border: "none", borderRadius: "8px",
+                                padding: "0.5rem 1.1rem",
+                                fontWeight: "600", fontSize: "0.8125rem",
+                                cursor: "pointer", whiteSpace: "nowrap",
+                                display: "flex", alignItems: "center", gap: "0.4rem",
+                              }}
+                            >
+                              📄 Download Agreement
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )
+            }
           </div>
         )}
 
@@ -750,6 +839,15 @@ export default function TenantDashboard() {
                     </div>
                   </button>
 
+                  {/* Utility Bills */}
+                  <button onClick={() => { setOthersSection("bills"); fetchBillSplits(); }} style={hubBtnStyle}>
+                    <div style={{ fontSize: "2rem", marginBottom: "0.75rem" }}>⚡</div>
+                    <div style={{ fontWeight: "700", fontSize: "1rem", color: "#111827", marginBottom: "0.375rem" }}>Utility Bills</div>
+                    <div style={{ fontSize: "0.8125rem", color: "#6b7280", lineHeight: "1.5" }}>
+                      View your electricity, water &amp; gas bill share.
+                    </div>
+                  </button>
+
                   {/* Daily Meal — placeholder */}
                   <div style={{ ...hubBtnStyle, opacity: 0.5, cursor: "not-allowed" }}>
                     <div style={{ fontSize: "2rem", marginBottom: "0.75rem" }}>🍽️</div>
@@ -931,6 +1029,104 @@ export default function TenantDashboard() {
                     ))
                   }
                 </div>
+              </div>
+            )}
+
+            {/* ── Utility Bills section ─────────────────── */}
+            {othersSection === "bills" && (
+              <div>
+                <div style={{ display: "flex", alignItems: "center", gap: "0.875rem", marginBottom: "1.5rem" }}>
+                  <button onClick={() => setOthersSection(null)}
+                    style={{ background: "#f3f4f6", border: "none", borderRadius: "8px", padding: "0.4rem 0.875rem", fontSize: "0.8125rem", fontWeight: "600", color: "#374151", cursor: "pointer" }}>
+                    ← Back
+                  </button>
+                  <div>
+                    <h3 style={{ margin: 0 }}>Utility Bills</h3>
+                    <p style={{ color: "var(--color-neutral-500)", fontSize: "0.875rem", marginTop: "0.125rem" }}>
+                      Your monthly share of electricity, water, gas &amp; internet.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Summary stats */}
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "1rem", marginBottom: "1.5rem" }}>
+                  {[
+                    { label: "Total Bills", value: billSplits.length,                                     color: "#111827" },
+                    { label: "Unpaid",      value: billSplits.filter(s => s.status === "unpaid").length,  color: "#b45309" },
+                    { label: "Paid",        value: billSplits.filter(s => s.status === "paid").length,    color: "#15803d" },
+                  ].map(s => (
+                    <div key={s.label} className="card" style={{ textAlign: "center", padding: "1.25rem" }}>
+                      <div style={{ fontSize: "1.75rem", fontWeight: "700", color: s.color }}>{s.value}</div>
+                      <div style={{ fontSize: "0.8125rem", color: "var(--color-neutral-500)", marginTop: "0.25rem" }}>{s.label}</div>
+                    </div>
+                  ))}
+                </div>
+
+                {billSuccess && <div style={successBannerStyle}>✓ {billSuccess}</div>}
+
+                {billLoading ? <LoadingSpinner /> : billError ? <ErrorState message={billError} /> :
+                  billSplits.length === 0 ? (
+                    <div className="card" style={{ textAlign: "center", padding: "3rem", color: "var(--color-neutral-400)" }}>
+                      No utility bills assigned yet. Your owner will post bills each month.
+                    </div>
+                  ) : (
+                    <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+                      {billSplits.map(s => {
+                        const bill = s.billId;
+                        const isPaid = s.status === "paid";
+                        return (
+                          <div key={s._id} className="card">
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "1rem" }}>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                {/* Title row */}
+                                <div style={{ display: "flex", alignItems: "center", gap: "0.625rem", marginBottom: "0.5rem", flexWrap: "wrap" }}>
+                                  <span style={{ fontWeight: "600", fontSize: "0.9375rem", color: "#111827" }}>
+                                    {bill?.propertyId?.title ?? "Property"} — {bill?.month ?? "—"}
+                                  </span>
+                                  <span style={{
+                                    display: "inline-block", padding: "0.2rem 0.6rem", borderRadius: "999px",
+                                    fontSize: "0.75rem", fontWeight: "600",
+                                    color: isPaid ? "#15803d" : "#b45309",
+                                    background: isPaid ? "#dcfce7" : "#fef3c7",
+                                  }}>{isPaid ? "Paid" : "Unpaid"}</span>
+                                </div>
+
+                                {/* Bill breakdown */}
+                                <div style={{ display: "flex", gap: "1.25rem", flexWrap: "wrap", fontSize: "0.8125rem", color: "#6b7280", marginBottom: "0.625rem" }}>
+                                  {bill?.electricity > 0 && <span>⚡ Electricity: BDT {bill.electricity.toLocaleString()}</span>}
+                                  {bill?.water       > 0 && <span>💧 Water: BDT {bill.water.toLocaleString()}</span>}
+                                  {bill?.gas         > 0 && <span>🔥 Gas: BDT {bill.gas.toLocaleString()}</span>}
+                                  {bill?.internet    > 0 && <span>🌐 Internet: BDT {bill.internet.toLocaleString()}</span>}
+                                </div>
+
+                                {/* Share summary */}
+                                <div style={{ fontSize: "0.875rem", color: "#374151" }}>
+                                  Total bill: <strong>BDT {bill?.total?.toLocaleString() ?? "—"}</strong>
+                                  <span style={{ color: "#d1d5db", margin: "0 0.5rem" }}>·</span>
+                                  Your share: <strong style={{ color: "#1d4ed8", fontSize: "1rem" }}>BDT {s.amount?.toLocaleString()}</strong>
+                                </div>
+                              </div>
+
+                              {/* Action */}
+                              <div style={{ display: "flex", alignItems: "center" }}>
+                                {!isPaid ? (
+                                  <button
+                                    onClick={() => handleMarkBillPaid(s._id)}
+                                    style={{ background: "#1d4ed8", color: "#fff", border: "none", borderRadius: "8px", padding: "0.5rem 1.25rem", fontWeight: "600", fontSize: "0.8125rem", cursor: "pointer" }}
+                                  >
+                                    Mark as Paid
+                                  </button>
+                                ) : (
+                                  <span style={{ fontSize: "0.875rem", color: "#15803d", fontWeight: "600" }}>✓ Paid</span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )
+                }
               </div>
             )}
           </div>
