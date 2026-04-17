@@ -94,9 +94,26 @@ export const guestLogAPI = {
   }),
 };
 
+export const userAPI = {
+  getProfile: () => request("/users/profile"), // (If your backend uses a different route like /auth/profile, adjust this string)
+  updateProfile: (data) => request("/users/profile", { method: "PUT", body: JSON.stringify(data) }),
+};
+
 // ── Notices ────────────────────────────────────────────────
 export const noticeAPI = {
-  getMy: () => request("/notices/my"),
+  getMy:       () => request("/notices/my"),
+  getAll:      () => request("/notices/all"),
+  getTenant:   () => request("/notices/tenant"),
+  create:      (body) => request("/notices", { method: "POST", body: JSON.stringify(body) }),
+  markAsRead:  (id) => request(`/notices/${id}/read`, { method: "PATCH" }),
+  markAllRead: () => request("/notices/read-all", { method: "PATCH" }),
+};
+
+// ── Meals ────────────────────────────────────────────────
+export const mealAPI = {
+  getPropertyMeals: (propertyId, date) => request(`/meals/property/${propertyId}?date=${date}`),
+  getMyPreference:  (date) => request(`/meals/my?date=${date}`),
+  toggleMyMeal:     (date, optedIn) => request("/meals/toggle", { method: "PUT", body: JSON.stringify({ date, optedIn }) }),
 };
 
 // ── Admin ──────────────────────────────────────────────────

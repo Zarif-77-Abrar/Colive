@@ -12,6 +12,8 @@ import paymentRoutes     from "./routes/paymentRoutes.js";
 import maintenanceRoutes from "./routes/maintenanceRoutes.js";
 import guestLogRoutes    from "./routes/guestLogRoutes.js";
 import noticeRoutes      from "./routes/noticeRoutes.js";
+import mealRoutes        from "./routes/mealRoutes.js";
+
 
 dns.setServers(["1.1.1.1", "8.8.8.8"]);
 dotenv.config();
@@ -32,6 +34,7 @@ app.use("/api/payments",    paymentRoutes);
 app.use("/api/maintenance", maintenanceRoutes);
 app.use("/api/guests",      guestLogRoutes);
 app.use("/api/notices",     noticeRoutes);
+app.use("/api/meals",       mealRoutes);
 
 // Health check
 app.get("/api/health", (req, res) => res.json({ status: "CoLive API running" }));
