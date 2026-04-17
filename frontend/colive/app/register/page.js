@@ -156,7 +156,7 @@ export default function RegisterPage() {
 
             {/* Role selector */}
             <div>
-              <label className="input-label">I am a</label>
+              <label className="input-label">I am a/an</label>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
                 {ROLES.map((r) => (
                   <label key={r.value} style={{

@@ -75,7 +75,7 @@ export default function HomePage() {
         </span>
         <div style={{ display: "flex", gap: "0.75rem" }}>
           <Link href="/login" className="btn btn-ghost btn-sm">Sign in</Link>
-          <Link href="/register" className="btn btn-primary btn-sm">Get started</Link>
+          {/* <Link href="/register" className="btn btn-primary btn-sm">Get started</Link> */}
         </div>
       </nav>
 
