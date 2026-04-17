@@ -89,22 +89,32 @@ export const getProfile = async (req, res) => {
 // ── POST /api/users/fcm-token ──────────────────────────────
 // Saves an FCM token to the user's fcmTokens array.
 // Deduplicates automatically — won't add the same token twice.
+
 export const saveFcmToken = async (req, res) => {
   const { token } = req.body;
   if (!token) return res.status(400).json({ message: "Token is required." });
 
   try {
+    // Remove this token from any other user who might have it
+    await User.updateMany(
+      { _id: { $ne: req.user.id }, fcmTokens: token },
+      { $pull: { fcmTokens: token } }
+    );
+
+    // Add to current user (deduplicates automatically)
     await User.findByIdAndUpdate(
       req.user.id,
-      { $addToSet: { fcmTokens: token } }, // $addToSet prevents duplicates
+      { $addToSet: { fcmTokens: token } },
       { new: true }
     );
+
     return res.status(200).json({ message: "FCM token saved." });
   } catch (err) {
     console.error("saveFcmToken error:", err.message);
     return res.status(500).json({ message: "Server error." });
   }
 };
+
 
 // ── DELETE /api/users/fcm-token ────────────────────────────
 // Removes an FCM token — call this on logout so the device

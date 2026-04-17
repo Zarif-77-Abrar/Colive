@@ -67,7 +67,8 @@ export default function OwnerDashboard() {
   const [actionLoading, setActionLoading] = useState(null);
   const [actionMsg,     setActionMsg]     = useState("");  
 
-  // useFCM();
+  useFCM();
+  
   const [othersSection, setOthersSection] = useState(null);
 
   // Maintenance state

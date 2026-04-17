@@ -137,12 +137,29 @@ export const removeToken = ()      => localStorage.removeItem("token");
 export const saveUser    = (user)  => localStorage.setItem("user", JSON.stringify(user));
 export const getUser     = ()      => { const u = localStorage.getItem("user"); return u ? JSON.parse(u) : null; };
 export const removeUser  = ()      => localStorage.removeItem("user");
-export const logout      = () => {
+
+export const logout = async () => {
   const fcmToken = localStorage.getItem("fcmToken");
-  removeToken();
-  removeUser();
+  const authToken = localStorage.getItem("token");
+
+  // Remove FCM token from backend BEFORE clearing auth token
+  if (fcmToken && authToken) {
+    try {
+      await fetch(`${BASE_URL}/users/fcm-token`, {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${authToken}`,
+        },
+        body: JSON.stringify({ token: fcmToken }),
+      });
+    } catch (_) {}
+  }
+
+  localStorage.removeItem("token");
+  localStorage.removeItem("user");
   localStorage.removeItem("fcmToken");
   localStorage.removeItem("fcmTokenUserId");
-  if (fcmToken) userAPI.removeFcmToken(fcmToken).catch(() => {});
+
   window.location.href = "/login";
 };
