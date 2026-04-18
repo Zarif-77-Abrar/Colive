@@ -119,6 +119,10 @@ export const conversationAPI = {
   markAsRead:  (conversationId)              => request(`/conversations/${conversationId}/read`, { method: "PUT" }),
 };
 
+export const alertAPI = {
+  sendEmergency: (tenantId) => request(`/alerts/emergency/${tenantId}`, { method: "POST" }),
+};
+
 export const adminAPI = {
   getStats:         () => request("/admin/stats"),
   getUsers:         () => request("/admin/users"),
@@ -142,7 +146,6 @@ export const logout = async () => {
   const fcmToken = localStorage.getItem("fcmToken");
   const authToken = localStorage.getItem("token");
 
-  // Remove FCM token from backend BEFORE clearing auth token
   if (fcmToken && authToken) {
     try {
       await fetch(`${BASE_URL}/users/fcm-token`, {
