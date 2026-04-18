@@ -170,6 +170,10 @@ export const conversationAPI = {
   markAsRead:  (conversationId)              => request(`/conversations/${conversationId}/read`, { method: "PUT" }),
 };
 
+export const alertAPI = {
+  sendEmergency: (tenantId) => request(`/alerts/emergency/${tenantId}`, { method: "POST" }),
+};
+
 export const adminAPI = {
   getStats:         () => request("/admin/stats"),
   getUsers:         () => request("/admin/users"),

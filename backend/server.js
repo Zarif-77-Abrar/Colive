@@ -18,6 +18,7 @@ import conversationRoutes   from "./routes/conversationRoutes.js";
 import utilityBillRoutes    from "./routes/utilityBillRoutes.js";
 import agreementRoutes      from "./routes/agreementRoutes.js";
 import { stripeWebhook }    from "./controllers/paymentController.js";
+import alertRoutes         from "./routes/alertRoutes.js";
 
 dns.setServers(["1.1.1.1", "8.8.8.8"]);
 dotenv.config({ override: true });
@@ -51,6 +52,7 @@ app.use("/api/compatibility", compatibilityRoutes);
 app.use("/api/conversations", conversationRoutes);
 app.use("/api/bills",         utilityBillRoutes);
 app.use("/api/agreements",    agreementRoutes);
+app.use("/api/alerts",         alertRoutes);
 
 app.get("/api/health", (req, res) => res.json({ status: "CoLive API running" }));
 

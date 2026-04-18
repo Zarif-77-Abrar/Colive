@@ -322,7 +322,8 @@ export default function OwnerDashboard() {
                         </div>
                         <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
                           <span style={{ fontSize: "0.875rem", color: "var(--color-neutral-600)" }}>{avail}/{p.rooms?.length ?? 0} available</span>
-                          <button className="btn btn-secondary btn-sm">Manage</button>
+                          {/* <button className="btn btn-secondary btn-sm">Manage</button> */}
+                          <Link href={`/owner/properties/${p._id}`} className="btn btn-secondary btn-sm">Manage</Link>
                         </div>
                       </div>
                     );
