@@ -75,7 +75,7 @@ export default function TenantDashboard() {
   const [monthFilter, setMonthFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
 
-  // useFCM();
+  useFCM();
 
   // ── Others sub-section ─────────────────────────────────
   const [othersSection, setOthersSection] = useState(null); // null | "guest"

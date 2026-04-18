@@ -70,7 +70,7 @@ export default function OwnerDashboard() {
   const [monthFilter, setMonthFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
 
-  // useFCM();
+  useFCM();
   const [othersSection, setOthersSection] = useState(null);
 
   // Maintenance state
