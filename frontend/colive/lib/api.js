@@ -40,11 +40,12 @@ export const userAPI = {
   updatePreferences: (body)  => request("/users/preferences", { method: "PUT",    body: JSON.stringify(body) }),
   saveFcmToken:      (token) => request("/users/fcm-token",   { method: "POST",   body: JSON.stringify({ token }) }),
   removeFcmToken:    (token) => request("/users/fcm-token",   { method: "DELETE", body: JSON.stringify({ token }) }),
+  // getTenantsByProperty: (propertyId) => request(`/users/property/${propertyId}/tenants`),
 };
 
 export const propertyAPI = {
   getAll:  (query = "") => request(`/properties${query}`),
-  getById: (id)         => request(`/properties/${id}`),
+  get: (id)         => request(`/properties/${id}`),
   getMy:   ()           => request("/properties/my"),
 };
 

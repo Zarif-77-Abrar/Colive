@@ -12,6 +12,18 @@ export default function useFCM() {
 
     const init = async () => {
       try {
+        // Register service worker first
+        // if ("serviceWorker" in navigator) {
+        //   try {
+        //     await navigator.serviceWorker.register("/firebase-messaging-sw.js", {
+        //       scope: "/",
+        //     });
+        //   } catch (err) {
+        //     console.error("Service worker registration failed:", err);
+        //     return;
+        //   }
+        // }
+
         const messaging = await getFirebaseMessaging();
         if (!messaging) return;
 
