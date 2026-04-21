@@ -4,12 +4,13 @@ import Property        from "../models/Property.js";
 import User            from "../models/User.js";
 import BookingRequest  from "../models/BookingRequest.js";
 
-const transporter = nodemailer.createTransport({
-  service: "gmail",
-  auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS },
-});
 
 const sendNoticeEmails = async (recipients, notice, propertyTitle) => {
+  const transporter = nodemailer.createTransport({
+    service: "gmail",
+    auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS },
+  });
+
   if (!recipients.length) {
     console.log("⚠️ No recipients found for this notice. Email skipped.");
     return;
