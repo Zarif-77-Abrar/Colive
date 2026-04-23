@@ -44,15 +44,37 @@ export default function Navbar() {
       top: 0,
       zIndex: 100,
     }}>
-      {/* Brand */}
-      <Link href="/" style={{
-        fontSize: "1.25rem",
-        fontWeight: "700",
-        color: "var(--color-primary-500)",
-        textDecoration: "none",
-      }}>
-        CoLive
-      </Link>
+      {/* Left side: Brand and Feature Links */}
+      <div style={{ display: "flex", alignItems: "center", gap: "2rem" }}>
+        {/* Brand */}
+        <Link href="/" style={{
+          fontSize: "1.25rem",
+          fontWeight: "700",
+          color: "var(--color-primary-500)",
+          textDecoration: "none",
+        }}>
+          CoLive
+        </Link>
+
+        {/* Feature Links */}
+        <div style={{ display: "flex", gap: "1.5rem", alignItems: "center" }}>
+          <Link href="/search" style={{
+            fontSize: "0.875rem", fontWeight: "500", color: "var(--color-neutral-600)", textDecoration: "none"
+          }}>
+            Advanced Search
+          </Link>
+          <Link href="/recommendations" style={{
+            fontSize: "0.875rem", fontWeight: "500", color: "var(--color-neutral-600)", textDecoration: "none"
+          }}>
+            AI Matchmaker
+          </Link>
+          <Link href="/notifications" style={{
+            fontSize: "0.875rem", fontWeight: "500", color: "var(--color-neutral-600)", textDecoration: "none"
+          }}>
+            Alerts
+          </Link>
+        </div>
+      </div>
 
       {/* Right side */}
       <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>

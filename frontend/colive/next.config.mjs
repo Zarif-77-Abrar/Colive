@@ -1,6 +1,6 @@
 const nextConfig = {
   env: {
-    NEXT_PUBLIC_API_URL: "http://localhost:1494/api",
+    NEXT_PUBLIC_API_URL: "http://localhost:9209/api",
   },
 };
 
