@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Navbar from "../../../components/Navbar";
@@ -9,103 +9,69 @@ import StatCard from "../../../components/StatCard";
 import DataTable from "../../../components/DataTable";
 import { LoadingSpinner, ErrorState } from "../../../components/LoadingState";
 import useApi from "../../../lib/useApi";
-import { getUser, propertyAPI, bookingAPI, maintenanceAPI, noticeAPI, guestLogAPI, paymentAPI, utilityBillAPI, agreementAPI } from "../../../lib/api";
-import useFCM from "../../../lib/useFCM";
+import { getUser, propertyAPI, bookingAPI, maintenanceAPI, noticeAPI, guestLogAPI, mealAPI } from "../../../lib/api";
 
 const TABS = [
-  { key: "overview",    label: "Overview"      },
+  { key: "overview",    label: "Overview"       },
   { key: "properties",  label: "My Properties" },
   { key: "bookings",    label: "Bookings"       },
   { key: "maintenance", label: "Maintenance"    },
   { key: "notices",     label: "Notices"        },
-  { key: "payments",    label: "Payments"       },
   { key: "messages",    label: "Messages"       },
-  { key: "others",      label: "Others"        },
+  { key: "others",      label: "Others"         },
 ];
 
 const fmtDate  = (d) => d ? new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "—";
 const fmtMoney = (n) => n != null ? `BDT ${Number(n).toLocaleString()}` : "—";
 
-const DEFAULT_TECHNICIAN = {
-  electrical: "Electrical Technician", plumbing: "Plumber",
-  gas: "Gas Technician", appliance: "Appliance Technician",
-  structural: "Structural Technician", pest_control: "Pest Control Technician",
-  internet: "Internet Technician", cleaning: "Cleaning Staff",
-  security: "Security Technician", other: "General Technician",
-};
-const TECHNICIAN_OPTIONS = [
-  "Electrical Technician","Plumber","Gas Technician","Appliance Technician",
-  "Structural Technician","Pest Control Technician","Internet Technician",
-  "Cleaning Staff","Security Staff","General Technician",
-];
+const DEFAULT_TECHNICIAN = { electrical: "Electrical Technician", plumbing: "Plumber", gas: "Gas Technician", appliance: "Appliance Technician", structural: "Structural Technician", pest_control: "Pest Control Technician", internet: "Internet Technician", cleaning: "Cleaning Staff", security: "Security Technician", other: "General Technician" };
+const TECHNICIAN_OPTIONS = ["Electrical Technician","Plumber","Gas Technician","Appliance Technician","Structural Technician","Pest Control Technician","Internet Technician","Cleaning Staff","Security Staff","General Technician"];
 
-const MSTATUS_META = {
-  pending:     { label: "Pending",     color: "#b45309", bg: "#fef3c7" },
-  in_progress: { label: "In Progress", color: "#1d4ed8", bg: "#dbeafe" },
-  resolved:    { label: "Resolved",    color: "#15803d", bg: "#dcfce7" },
-};
-const PRIORITY_META = {
-  low:    { label: "Low",    color: "#6b7280", bg: "#f3f4f6" },
-  medium: { label: "Medium", color: "#b45309", bg: "#fef3c7" },
-  high:   { label: "High",   color: "#dc2626", bg: "#fee2e2" },
-};
-const GSTATUS_META = {
-  pending:  { label: "Pending",  color: "#b45309", bg: "#fef3c7" },
-  approved: { label: "Approved", color: "#15803d", bg: "#dcfce7" },
-  rejected: { label: "Rejected", color: "#dc2626", bg: "#fee2e2" },
-};
+const MSTATUS_META = { pending: { label: "Pending", color: "#b45309", bg: "#fef3c7" }, in_progress: { label: "In Progress", color: "#1d4ed8", bg: "#dbeafe" }, resolved: { label: "Resolved", color: "#15803d", bg: "#dcfce7" } };
+const PRIORITY_META = { low: { label: "Low", color: "#6b7280", bg: "#f3f4f6" }, medium: { label: "Medium", color: "#b45309", bg: "#fef3c7" }, high: { label: "High", color: "#dc2626", bg: "#fee2e2" } };
+const GSTATUS_META  = { pending: { label: "Pending", color: "#b45309", bg: "#fef3c7" }, approved: { label: "Approved", color: "#15803d", bg: "#dcfce7" }, rejected: { label: "Rejected", color: "#dc2626", bg: "#fee2e2" } };
 
 const Badge = ({ meta }) => (
-  <span style={{ display: "inline-block", padding: "0.2rem 0.6rem", borderRadius: "999px", fontSize: "0.75rem", fontWeight: "600", color: meta.color, background: meta.bg }}>
-    {meta.label}
-  </span>
+  <span style={{ display: "inline-block", padding: "0.2rem 0.6rem", borderRadius: "999px", fontSize: "0.75rem", fontWeight: "600", color: meta.color, background: meta.bg }}>{meta.label}</span>
 );
 
 export default function OwnerDashboard() {
   const router = useRouter();
-  const [user, setUser]   = useState(null);
-  const [active, setActive] = useState("overview");
+  const [user,          setUser]          = useState(null);
+  const [active,        setActive]        = useState("overview");
   const [actionLoading, setActionLoading] = useState(null);
-  const [actionMsg,     setActionMsg]     = useState("");  
-  const [monthFilter, setMonthFilter] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
-
-  // useFCM();
+  const [actionMsg,     setActionMsg]     = useState("");
   const [othersSection, setOthersSection] = useState(null);
 
-  // Maintenance state
-  const [mRequests, setMRequests]         = useState([]);
-  const [mLoading, setMLoading]           = useState(false);
-  const [mError, setMError]               = useState("");
-  const [mFilter, setMFilter]             = useState("all");
-  const [mActionCard, setMActionCard]     = useState(null);
-  const [techInput, setTechInput]         = useState("");
-  const [mStatusInput, setMStatusInput]   = useState("");
+  const [mRequests,      setMRequests]      = useState([]);
+  const [mLoading,       setMLoading]       = useState(false);
+  const [mError,         setMError]         = useState("");
+  const [mFilter,        setMFilter]        = useState("all");
+  const [mActionCard,    setMActionCard]    = useState(null);
+  const [techInput,      setTechInput]      = useState("");
+  const [mStatusInput,   setMStatusInput]   = useState("");
   const [mActionLoading, setMActionLoading] = useState(false);
-  const [mActionError, setMActionError]   = useState("");
-  const [mSuccess, setMSuccess]           = useState("");
+  const [mActionError,   setMActionError]   = useState("");
+  const [mSuccess,       setMSuccess]       = useState("");
 
-  // Guest log state
-  const [gLogs, setGLogs]               = useState([]);
-  const [gLoading, setGLoading]         = useState(false);
-  const [gError, setGError]             = useState("");
-  const [gFilter, setGFilter]           = useState("all");
-  const [gActionCard, setGActionCard]   = useState(null);
-  const [gStatusInput, setGStatusInput] = useState("pending");
-  const [gActionLoading, setGActionLoading] = useState(false);
-  const [gActionError, setGActionError] = useState("");
-  const [gSuccess, setGSuccess]         = useState("");
+  const [gLogs,         setGLogs]         = useState([]);
+  const [gLoading,      setGLoading]      = useState(false);
+  const [gError,        setGError]        = useState("");
+  const [gFilter,       setGFilter]       = useState("all");
+  const [gSuccess,      setGSuccess]      = useState("");
+  const [gActionError,  setGActionError]  = useState("");
 
-  // Utility bill state
-  const [propertyBills,  setPropertyBills]  = useState([]);
-  const [billFormLoading, setBillFormLoading] = useState(false);
-  const [billFormSuccess, setBillFormSuccess] = useState("");
-  const [billFormError,   setBillFormError]   = useState("");
+  // ── Notice State ─────────────────────────────────────────
+  const [noticeForm, setNoticeForm] = useState({ title: "", message: "", propertyId: "" });
+  const [noticePosting, setNoticePosting] = useState(false);
+  const [noticePostError, setNoticePostError] = useState("");
+  const [noticePostSuccess, setNoticePostSuccess] = useState("");
 
-  const currentMonth = useMemo(() => { const now = new Date(); return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`; }, []);
-
-  const EMPTY_BILL = useMemo(() => ({ propertyId: "", month: currentMonth, electricity: "", water: "", gas: "", internet: "" }), [currentMonth]);
-  const [billForm, setBillForm] = useState({ propertyId: "", month: "", electricity: "", water: "", gas: "", internet: "" });
+  // ── Meal State ───────────────────────────────────────────
+  const [mealPropFilter, setMealPropFilter] = useState("");
+  const [todayMenu, setTodayMenu] = useState([]);
+  const [mealStats, setMealStats] = useState({ yes: [], no: [] });
+  const [mealLoading, setMealLoading] = useState(false);
 
   useEffect(() => {
     const u = getUser();
@@ -114,27 +80,9 @@ export default function OwnerDashboard() {
     setUser(u);
   }, [router]);
 
-  const handleBookingAction = async (bookingId, action) => {
-    setActionLoading(bookingId + action);
-    setActionMsg("");
-    try {
-      await bookingAPI[action === "accept" ? "accept" : "reject"](bookingId);
-      setActionMsg(`Booking ${action}ed successfully.`);
-      // bookings.refetch?.();
-      setTimeout(() => window.location.reload(), 1000);
-    } catch (err) {
-      setActionMsg(err.message);
-    } finally {
-      setActionLoading(null);
-    }
-  };
-
   const properties = useApi(propertyAPI.getMy);
   const bookings   = useApi(bookingAPI.getReceived);
   const notices    = useApi(noticeAPI.getMy);
-
-  const allPaymentsRes = useApi(() => paymentAPI.getProperty(""));
-  const filteredPaymentsRes = useApi(() => paymentAPI.getProperty(`?month=${encodeURIComponent(monthFilter)}&status=${encodeURIComponent(statusFilter)}`), [monthFilter, statusFilter]);
 
   const fetchMaintenance = useCallback(async () => {
     setMLoading(true); setMError("");
@@ -148,66 +96,73 @@ export default function OwnerDashboard() {
     catch (e) { setGError(e.message); } finally { setGLoading(false); }
   }, []);
 
-  const fetchPropertyBills = useCallback(async () => {
-    try { const d = await utilityBillAPI.getProperty(); setPropertyBills(d.bills ?? []); }
-    catch (e) { console.error(e.message); }
-  }, []);
+  useEffect(() => {
+    if (user) { fetchMaintenance(); fetchGuestLogs(); }
+  }, [user, fetchMaintenance, fetchGuestLogs]);
 
-  const handleBillSubmit = async (e) => {
-    e.preventDefault();
-    setBillFormLoading(true); setBillFormError(""); setBillFormSuccess("");
-    try {
-      await utilityBillAPI.createOrUpdate({
-        propertyId:  billForm.propertyId,
-        month:       billForm.month,
-        electricity: Number(billForm.electricity) || 0,
-        water:       Number(billForm.water)       || 0,
-        gas:         Number(billForm.gas)         || 0,
-        internet:    Number(billForm.internet)    || 0,
-      });
-      setBillFormSuccess("Bill saved and split among tenants.");
-      setBillForm(EMPTY_BILL);
-      fetchPropertyBills();
-      setTimeout(() => setBillFormSuccess(""), 4000);
-    } catch (err) {
-      setBillFormError(err.message);
-    } finally {
-      setBillFormLoading(false);
-    }
-  };
-
-  const handleDownloadAgreement = async (bookingId) => {
-    try {
-      const base64 = await agreementAPI.download(bookingId);
-      const binaryString = window.atob(base64);
-      const bytes = new Uint8Array(binaryString.length);
-      for (let i = 0; i < binaryString.length; i++) {
-        bytes[i] = binaryString.charCodeAt(i);
+  // ── Meal Fetching Effect ─────────────────────────────────
+  useEffect(() => {
+    const fetchMealData = async () => {
+      if (!mealPropFilter) {
+        setTodayMenu([]);
+        setMealStats({ yes: [], no: [] });
+        return;
       }
-      const blob = new Blob([bytes], { type: "application/pdf" });
-      const url  = URL.createObjectURL(blob);
-      window.open(url, "_blank");
-      setTimeout(() => URL.revokeObjectURL(url), 10000);
+      setMealLoading(true);
+      try {
+        const [menuRes, statsRes] = await Promise.all([
+          mealAPI.getMenu(mealPropFilter),
+          mealAPI.getStats(mealPropFilter)
+        ]);
+        setTodayMenu(menuRes.menu?.items || []);
+        setMealStats(statsRes.stats || { yes: [], no: [] });
+      } catch (err) {
+        console.error("Meal fetch error:", err);
+      } finally {
+        setMealLoading(false);
+      }
+    };
+    fetchMealData();
+  }, [mealPropFilter]);
+
+  // ── Handlers ─────────────────────────────────────────────
+  const handleNoticeSubmit = async (e) => {
+    e.preventDefault();
+    if (!noticeForm.title.trim() || !noticeForm.message.trim() || !noticeForm.propertyId) {
+      setNoticePostError("Please fill all fields.");
+      return;
+    }
+    setNoticePosting(true);
+    setNoticePostError("");
+    setNoticePostSuccess("");
+    try {
+      await noticeAPI.create(noticeForm);
+      setNoticePostSuccess("Notice posted and emailed to tenants successfully.");
+      setNoticeForm({ title: "", message: "", propertyId: "" });
+      notices.refetch?.(); 
+      setTimeout(() => setNoticePostSuccess(""), 4000);
     } catch (err) {
-      alert("Could not generate agreement: " + err.message);
+      setNoticePostError(err.message || "Failed to post notice.");
+    } finally {
+      setNoticePosting(false);
     }
   };
 
-  useEffect(() => {
-    if (user) { fetchMaintenance(); fetchGuestLogs(); fetchPropertyBills(); }
-  }, [user, fetchMaintenance, fetchGuestLogs, fetchPropertyBills]);
+  const handleBookingAction = async (bookingId, action) => {
+    setActionLoading(bookingId + action); setActionMsg("");
+    try {
+      await bookingAPI[action === "accept" ? "accept" : "reject"](bookingId);
+      setActionMsg(`Booking ${action}ed successfully.`);
+      setTimeout(() => window.location.reload(), 1000);
+    } catch (err) { setActionMsg(err.message); } finally { setActionLoading(null); }
+  };
 
-  // Sync month field once currentMonth is ready
-  useEffect(() => {
-    setBillForm(prev => prev.month ? prev : { ...prev, month: currentMonth });
-  }, [currentMonth]);
-
-  // Maintenance handlers
   const openMActionCard = (r) => {
     setMActionCard(r._id); setMStatusInput(r.status);
     setTechInput(r.technicianName || DEFAULT_TECHNICIAN[r.category] || "General Technician");
     setMActionError("");
   };
+  
   const handleMSave = async (id) => {
     setMActionLoading(true); setMActionError("");
     try {
@@ -216,19 +171,6 @@ export default function OwnerDashboard() {
       setMSuccess("Request updated."); setMActionCard(null); fetchMaintenance();
       setTimeout(() => setMSuccess(""), 3000);
     } catch (e) { setMActionError(e.message); } finally { setMActionLoading(false); }
-  };
-
-  // Guest log handlers
-  const openGActionCard = (g) => {
-    setGActionCard(g._id); setGStatusInput(g.status); setGActionError("");
-  };
-  const handleGSave = async (id) => {
-    setGActionLoading(true); setGActionError("");
-    try {
-      await guestLogAPI.updateStatus(id, gStatusInput);
-      setGSuccess("Status updated."); setGActionCard(null); fetchGuestLogs();
-      setTimeout(() => setGSuccess(""), 3000);
-    } catch (e) { setGActionError(e.message); } finally { setGActionLoading(false); }
   };
 
   if (!user) return null;
@@ -240,14 +182,8 @@ export default function OwnerDashboard() {
 
   const mFiltered = mFilter === "all" ? mRequests : mRequests.filter(r => r.status === mFilter);
   const mCounts   = { all: mRequests.length, pending: mRequests.filter(r => r.status === "pending").length, in_progress: mRequests.filter(r => r.status === "in_progress").length, resolved: mRequests.filter(r => r.status === "resolved").length };
-
   const gFiltered = gFilter === "all" ? gLogs : gLogs.filter(g => g.status === gFilter);
   const gCounts   = { all: gLogs.length, pending: gLogs.filter(g => g.status === "pending").length, approved: gLogs.filter(g => g.status === "approved").length, rejected: gLogs.filter(g => g.status === "rejected").length };
-
-  const allOwnerPayments = allPaymentsRes.data?.payments ?? [];
-  const filteredPayments = filteredPaymentsRes.data?.payments ?? [];
-  const paymentsThisMonth = allOwnerPayments.filter((p) => p.month === currentMonth && p.paymentStatus === "paid").length;
-  const totalCollected = allOwnerPayments.filter((p) => p.paymentStatus === "paid").reduce((sum, p) => sum + (p.amount ?? 0), 0);
 
   return (
     <div style={{ minHeight: "100vh", background: "var(--color-neutral-50)" }}>
@@ -262,12 +198,10 @@ export default function OwnerDashboard() {
             <h2 style={{ marginBottom: "0.25rem" }}>Owner Dashboard</h2>
             <p style={{ color: "var(--color-neutral-500)", marginBottom: "2rem", fontSize: "0.9375rem" }}>Manage your properties, tenants, and bookings.</p>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "1rem", marginBottom: "2rem" }}>
-              <StatCard label="Total properties" value={properties.data?.count ?? "—"} sub={`${totalRooms} rooms total`}    accent="primary" />
-              <StatCard label="Available rooms"  value={availableRooms}               sub="across all properties"           accent="success" />
-              <StatCard label="Pending bookings" value={pendingBookings}              sub="awaiting your response"           accent="warning" />
-              <StatCard label="Open maintenance" value={openMaintenance}              sub="unresolved requests"              accent="error"   />
-              <StatCard label="Payments this month" value={paymentsThisMonth} sub="successful payments" accent="success" />
-              <StatCard label="Total collected" value={fmtMoney(totalCollected)} sub="from paid rent records" accent="primary" />
+              <StatCard label="Total properties" value={properties.data?.count ?? "—"} sub={`${totalRooms} rooms total`} accent="primary" />
+              <StatCard label="Available rooms"  value={availableRooms}               sub="across all properties"       accent="success" />
+              <StatCard label="Pending bookings" value={pendingBookings}              sub="awaiting your response"       accent="warning" />
+              <StatCard label="Open maintenance" value={openMaintenance}              sub="unresolved requests"          accent="error"   />
             </div>
             <div className="card" style={{ marginBottom: "1.5rem" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
@@ -276,10 +210,7 @@ export default function OwnerDashboard() {
               </div>
               {bookings.loading ? <LoadingSpinner /> : bookings.error ? <ErrorState message={bookings.error} /> : (
                 <DataTable headers={["Tenant", "Property", "Room", "Compatibility", "Requested"]} emptyMessage="No pending booking requests."
-                  rows={(bookings.data?.bookings ?? []).filter(b => b.status === "pending").slice(0, 5).map(b => [
-                    b.tenantId?.name ?? "—", b.propertyId?.title ?? "—", b.roomId?.label ?? "—",
-                    b.compatibilityScore != null ? `${b.compatibilityScore}%` : "—", fmtDate(b.createdAt),
-                  ])} />
+                  rows={(bookings.data?.bookings ?? []).filter(b => b.status === "pending").slice(0, 5).map(b => [b.tenantId?.name ?? "—", b.propertyId?.title ?? "—", b.roomId?.label ?? "—", b.compatibilityScore != null ? `${b.compatibilityScore}%` : "—", fmtDate(b.createdAt)])} />
               )}
             </div>
             <div className="card">
@@ -289,9 +220,7 @@ export default function OwnerDashboard() {
               </div>
               {mLoading ? <LoadingSpinner /> : mError ? <ErrorState message={mError} /> : (
                 <DataTable headers={["Title", "Category", "Property", "Room", "Status"]} emptyMessage="No open maintenance requests."
-                  rows={mRequests.filter(r => r.status !== "resolved").slice(0, 5).map(r => [
-                    r.title, r.category, r.propertyId?.title ?? "—", r.roomId?.label ?? "—", r.status,
-                  ])} />
+                  rows={mRequests.filter(r => r.status !== "resolved").slice(0, 5).map(r => [r.title, r.category, r.propertyId?.title ?? "—", r.roomId?.label ?? "—", r.status])} />
               )}
             </div>
           </div>
@@ -322,8 +251,7 @@ export default function OwnerDashboard() {
                         </div>
                         <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
                           <span style={{ fontSize: "0.875rem", color: "var(--color-neutral-600)" }}>{avail}/{p.rooms?.length ?? 0} available</span>
-                          {/* <button className="btn btn-secondary btn-sm">Manage</button> */}
-                          <Link href={`/owner/properties/${p._id}`} className="btn btn-secondary btn-sm">Manage</Link>
+                          <button className="btn btn-secondary btn-sm">Manage</button>
                         </div>
                       </div>
                     );
@@ -339,86 +267,35 @@ export default function OwnerDashboard() {
           <div>
             <h3 style={{ marginBottom: "1.5rem" }}>All booking requests</h3>
             <div className="card">
-              
               {actionMsg && (
-                <div style={{
-                  padding: "0.75rem 1rem", borderRadius: "var(--radius-md)",
-                  marginBottom: "1rem", fontSize: "0.875rem",
-                  background: "var(--color-success-50)",
-                  border: "1px solid var(--color-success-500)",
-                  color: "var(--color-success-700)",
-                }}>
+                <div style={{ padding: "0.75rem 1rem", borderRadius: "var(--radius-md)", marginBottom: "1rem", fontSize: "0.875rem", background: "var(--color-success-50)", border: "1px solid var(--color-success-500)", color: "var(--color-success-700)" }}>
                   {actionMsg}
                 </div>
               )}
               {bookings.loading ? <LoadingSpinner /> : bookings.error ? <ErrorState message={bookings.error} /> : (
                 <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-                  {bookings.data?.bookings?.length === 0 && (
-                    <p style={{ color: "var(--color-neutral-400)", fontSize: "0.875rem" }}>No booking requests received yet.</p>
-                  )}
-                  {(bookings.data?.bookings ?? []).map((b) => (
-                    <div key={b._id} style={{
-                      padding: "1rem", borderRadius: "var(--radius-md)",
-                      border: "1px solid var(--color-neutral-200)",
-                      display: "flex", justifyContent: "space-between",
-                      alignItems: "center", flexWrap: "wrap", gap: "1rem",
-                    }}>
+                  {bookings.data?.bookings?.length === 0 && <p style={{ color: "var(--color-neutral-400)", fontSize: "0.875rem" }}>No booking requests received yet.</p>}
+                  {(bookings.data?.bookings ?? []).map(b => (
+                    <div key={b._id} style={{ padding: "1rem", borderRadius: "var(--radius-md)", border: "1px solid var(--color-neutral-200)", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "1rem" }}>
                       <div>
-                        <p style={{ fontWeight: "600", marginBottom: "0.25rem" }}>
-                          {b.tenantId?.name ?? "—"} → {b.propertyId?.title ?? "—"}, {b.roomId?.label ?? "—"}
-                        </p>
-                        <p style={{ fontSize: "0.8125rem", color: "var(--color-neutral-500)" }}>
-                          {fmtMoney(b.roomId?.rent)}/mo
-                          {b.compatibilityScore != null ? ` · ${b.compatibilityScore}% compatibility` : ""}
-                          {" · "}{fmtDate(b.createdAt)}
-                        </p>
-                        {b.message && (
-                          <p style={{ fontSize: "0.8125rem", color: "var(--color-neutral-600)", marginTop: "0.25rem" }}>
-                            &ldquo;{b.message}&rdquo;
-                          </p>
-                        )}
+                        <p style={{ fontWeight: "600", marginBottom: "0.25rem" }}>{b.tenantId?.name ?? "—"} → {b.propertyId?.title ?? "—"}, {b.roomId?.label ?? "—"}</p>
+                        <p style={{ fontSize: "0.8125rem", color: "var(--color-neutral-500)" }}>{fmtMoney(b.roomId?.rent)}/mo{b.compatibilityScore != null ? ` · ${b.compatibilityScore}% compatibility` : ""} · {fmtDate(b.createdAt)}</p>
+                        {b.message && <p style={{ fontSize: "0.8125rem", color: "var(--color-neutral-600)", marginTop: "0.25rem" }}>&ldquo;{b.message}&rdquo;</p>}
                       </div>
-                      <div style={{ display: "flex", alignItems: "center", gap: "0.625rem", flexWrap: "wrap" }}>
-                        {b.status === "accepted" && (
-                          <button
-                            onClick={() => handleDownloadAgreement(b._id)}
-                            style={{ background: "#1a3c5e", color: "#fff", border: "none", borderRadius: "8px", padding: "0.45rem 1rem", fontWeight: "600", fontSize: "0.8rem", cursor: "pointer", whiteSpace: "nowrap" }}
-                          >
-                            📄 Agreement
-                          </button>
-                        )}
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.625rem" }}>
                         {b.status === "pending" ? (
                           <>
-                            <button
-                              className="btn btn-primary btn-sm"
-                              disabled={!!actionLoading}
-                              onClick={() => handleBookingAction(b._id, "accept")}
-                            >
-                              {actionLoading === b._id + "accept" ? "..." : "Accept"}
-                            </button>
-                            <button
-                              className="btn btn-danger btn-sm"
-                              disabled={!!actionLoading}
-                              onClick={() => handleBookingAction(b._id, "reject")}
-                            >
-                              {actionLoading === b._id + "reject" ? "..." : "Decline"}
-                            </button>
+                            <button className="btn btn-primary btn-sm" disabled={!!actionLoading} onClick={() => handleBookingAction(b._id, "accept")}>{actionLoading === b._id + "accept" ? "..." : "Accept"}</button>
+                            <button className="btn btn-danger btn-sm"  disabled={!!actionLoading} onClick={() => handleBookingAction(b._id, "reject")}>{actionLoading === b._id + "reject" ? "..." : "Decline"}</button>
                           </>
                         ) : (
-                          <span style={{
-                            fontSize: "0.75rem", fontWeight: "500",
-                            padding: "0.2rem 0.625rem", borderRadius: "9999px",
-                            background: b.status === "accepted" ? "var(--color-success-50)" : "var(--color-error-50)",
-                            color: b.status === "accepted" ? "var(--color-success-700)" : "var(--color-error-700)",
-                          }}>
-                            {b.status}
-                          </span>
+                          <span style={{ fontSize: "0.75rem", fontWeight: "500", padding: "0.2rem 0.625rem", borderRadius: "9999px", background: b.status === "accepted" ? "var(--color-success-50)" : "var(--color-error-50)", color: b.status === "accepted" ? "var(--color-success-700)" : "var(--color-error-700)" }}>{b.status}</span>
                         )}
                       </div>
                     </div>
                   ))}
                 </div>
-              )}                
+              )}
             </div>
           </div>
         )}
@@ -473,24 +350,15 @@ export default function OwnerDashboard() {
                         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", alignItems: "end" }}>
                           <div>
                             <p style={panelLabelStyle}>Status</p>
-                            <select value={mStatusInput} onChange={e => setMStatusInput(e.target.value)} style={selectStyle}>
-                              <option value="pending">Pending</option>
-                              <option value="in_progress">In Progress</option>
-                              <option value="resolved">Resolved</option>
-                            </select>
+                            <select value={mStatusInput} onChange={e => setMStatusInput(e.target.value)} style={selectStyle}><option value="pending">Pending</option><option value="in_progress">In Progress</option><option value="resolved">Resolved</option></select>
                           </div>
                           <div>
                             <p style={panelLabelStyle}>Assigned Technician</p>
-                            <select value={techInput} onChange={e => setTechInput(e.target.value)} style={selectStyle}>
-                              {TECHNICIAN_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
-                            </select>
+                            <select value={techInput} onChange={e => setTechInput(e.target.value)} style={selectStyle}>{TECHNICIAN_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}</select>
                           </div>
                         </div>
                         <div style={{ display: "flex", justifyContent: "flex-end" }}>
-                          <button onClick={() => handleMSave(r._id)} disabled={mActionLoading}
-                            style={{ ...saveBtnStyle, opacity: mActionLoading ? 0.6 : 1 }}>
-                            {mActionLoading ? "Saving..." : "Save Changes"}
-                          </button>
+                          <button onClick={() => handleMSave(r._id)} disabled={mActionLoading} style={{ ...saveBtnStyle, opacity: mActionLoading ? 0.6 : 1 }}>{mActionLoading ? "Saving..." : "Save Changes"}</button>
                         </div>
                       </div>
                     )}
@@ -506,23 +374,21 @@ export default function OwnerDashboard() {
           <div>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem" }}>
               <h3>Notices</h3>
-              <button className="btn btn-primary btn-sm">+ Post notice</button>
+              <button className="btn btn-primary btn-sm" onClick={() => { setActive("others"); setOthersSection("notice"); }}>+ Post notice</button>
             </div>
             {notices.loading ? <LoadingSpinner /> : notices.error ? <ErrorState message={notices.error} /> :
               notices.data?.notices?.length === 0 ? (
-                <div className="card" style={{ textAlign: "center", padding: "3rem" }}>
-                  <p style={{ color: "var(--color-neutral-500)" }}>No notices posted yet.</p>
-                </div>
+                <div className="card" style={{ textAlign: "center", padding: "3rem" }}><p style={{ color: "var(--color-neutral-500)" }}>No notices posted yet.</p></div>
               ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
                   {(notices.data?.notices ?? []).map(n => (
                     <div key={n._id} className="card">
                       <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: "0.5rem", marginBottom: "0.5rem" }}>
-                        <p style={{ fontWeight: "600" }}>{n.title}</p>
+                        <p style={{ fontWeight: "600", margin: 0 }}>{n.title}</p>
                         <span style={{ fontSize: "0.75rem", color: "var(--color-neutral-400)" }}>{fmtDate(n.createdAt)}</span>
                       </div>
                       <p style={{ fontSize: "0.8125rem", color: "var(--color-neutral-500)", marginBottom: "0.5rem" }}>{n.propertyId?.title ?? "—"}</p>
-                      <p style={{ fontSize: "0.875rem", color: "var(--color-neutral-700)" }}>{n.message}</p>
+                      <p style={{ fontSize: "0.875rem", color: "var(--color-neutral-700)", margin: 0, whiteSpace: "pre-wrap" }}>{n.message}</p>
                     </div>
                   ))}
                 </div>
@@ -531,61 +397,22 @@ export default function OwnerDashboard() {
           </div>
         )}
 
-        {/* ── Payments ──────────────────────────────────────── */}
-        {active === "payments" && (
-          <div>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem", flexWrap: "wrap", gap: "1rem" }}>
-              <h3>Rent payment tracking</h3>
-            </div>
-            <div className="card" style={{ marginBottom: "1rem", display: "flex", gap: "1rem", flexWrap: "wrap", alignItems: "end" }}>
-              <div>
-                <label style={{ display: "block", fontSize: "0.85rem", marginBottom: "0.35rem", color: "var(--color-neutral-600)" }}>Filter by month</label>
-                <input type="month" value={monthFilter} onChange={(e) => setMonthFilter(e.target.value)} className="input" />
-              </div>
-              <div>
-                <label style={{ display: "block", fontSize: "0.85rem", marginBottom: "0.35rem", color: "var(--color-neutral-600)" }}>Filter by status</label>
-                <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="input">
-                  <option value="">All</option>
-                  <option value="paid">Paid</option>
-                  <option value="pending">Pending</option>
-                  <option value="failed">Failed</option>
-                </select>
-              </div>
-              <button className="btn btn-ghost" onClick={() => { setMonthFilter(""); setStatusFilter(""); }}>Reset filters</button>
-            </div>
-            <div className="card">
-              {filteredPaymentsRes.loading ? <LoadingSpinner /> : filteredPaymentsRes.error ? <ErrorState message={filteredPaymentsRes.error} /> : (
-                <DataTable headers={["Tenant", "Email", "Property", "Room", "Amount", "Month", "Status", "Paid on"]} emptyMessage="No payment records found."
-                  rows={filteredPayments.map((p) => [
-                    p.tenantId?.name ?? "—", p.tenantId?.email ?? "—", p.propertyId?.title ?? "—", p.roomId?.label ?? "—",
-                    fmtMoney(p.amount), p.month ?? "—", p.paymentStatus, fmtDate(p.paidAt),
-                  ])} />
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* ── Messages ────────────────────────────────────── */}
-    
+        {/* ── Messages ───────────────────────────────────── */}
         {active === "messages" && (
           <div>
             <h3 style={{ marginBottom: "1.5rem" }}>Messages</h3>
             <div className="card">
               <div style={{ textAlign: "center", padding: "2rem" }}>
-                <p style={{ color: "var(--color-neutral-600)", marginBottom: "1rem" }}>
-                  View and manage your conversations with tenants.
-                </p>
-                <Link href="/messages" className="btn btn-primary">
-                  Go to messages
-                </Link>
+                <p style={{ color: "var(--color-neutral-600)", marginBottom: "1rem" }}>View and manage your conversations with tenants.</p>
+                <Link href="/messages" className="btn btn-primary">Go to messages</Link>
               </div>
             </div>
           </div>
         )}
+
         {/* ── Others ─────────────────────────────────────── */}
         {active === "others" && (
           <div>
-            {/* Hub */}
             {!othersSection && (
               <div>
                 <h3 style={{ marginBottom: "0.25rem" }}>Others</h3>
@@ -596,40 +423,30 @@ export default function OwnerDashboard() {
                     <div style={{ fontWeight: "700", fontSize: "1rem", color: "#111827", marginBottom: "0.375rem" }}>Guest Entry Log</div>
                     <div style={{ fontSize: "0.8125rem", color: "#6b7280", lineHeight: "1.5" }}>Review and approve guest visits for your properties.</div>
                   </button>
-                  <button onClick={() => { setOthersSection("bills"); fetchPropertyBills(); }} style={hubBtnStyle}>
-                    <div style={{ fontSize: "2rem", marginBottom: "0.75rem" }}>⚡</div>
-                    <div style={{ fontWeight: "700", fontSize: "1rem", color: "#111827", marginBottom: "0.375rem" }}>Utility Bills</div>
-                    <div style={{ fontSize: "0.8125rem", color: "#6b7280", lineHeight: "1.5" }}>Post monthly bills — auto-split among tenants.</div>
-                  </button>
-                  <div style={{ ...hubBtnStyle, opacity: 0.5, cursor: "not-allowed" }}>
+                  <button onClick={() => setOthersSection("meal")} style={hubBtnStyle}>
                     <div style={{ fontSize: "2rem", marginBottom: "0.75rem" }}>🍽️</div>
                     <div style={{ fontWeight: "700", fontSize: "1rem", color: "#111827", marginBottom: "0.375rem" }}>Daily Meal</div>
-                    <div style={{ fontSize: "0.8125rem", color: "#6b7280" }}>Coming soon.</div>
-                  </div>
-                  <div style={{ ...hubBtnStyle, opacity: 0.5, cursor: "not-allowed" }}>
+                    <div style={{ fontSize: "0.8125rem", color: "#6b7280", lineHeight: "1.5" }}>Track today&apos;s tenant meal preferences.</div>
+                  </button>
+                  <button onClick={() => setOthersSection("notice")} style={hubBtnStyle}>
                     <div style={{ fontSize: "2rem", marginBottom: "0.75rem" }}>📢</div>
-                    <div style={{ fontWeight: "700", fontSize: "1rem", color: "#111827", marginBottom: "0.375rem" }}>Check Notice</div>
-                    <div style={{ fontSize: "0.8125rem", color: "#6b7280" }}>Coming soon.</div>
-                  </div>
+                    <div style={{ fontWeight: "700", fontSize: "1rem", color: "#111827", marginBottom: "0.375rem" }}>Notice</div>
+                    <div style={{ fontSize: "0.8125rem", color: "#6b7280", lineHeight: "1.5" }}>Post notices to your tenants.</div>
+                  </button>
                 </div>
               </div>
             )}
 
             {/* Guest Entry Log */}
             {othersSection === "guest" && (
-              <div>
+              <div style={{ maxWidth: "1000px", margin: "0 auto" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "0.875rem", marginBottom: "1.5rem" }}>
-                  <button onClick={() => setOthersSection(null)}
-                    style={{ background: "#f3f4f6", border: "none", borderRadius: "8px", padding: "0.4rem 0.875rem", fontSize: "0.8125rem", fontWeight: "600", color: "#374151", cursor: "pointer" }}>
-                    ← Back
-                  </button>
+                  <button onClick={() => setOthersSection(null)} style={backBtnStyle}>← Back</button>
                   <div>
                     <h3 style={{ margin: 0 }}>Guest Entry Log</h3>
                     <p style={{ color: "var(--color-neutral-500)", fontSize: "0.875rem", marginTop: "0.125rem" }}>Your properties only · Approve or reject guest visits.</p>
                   </div>
                 </div>
-
-                {/* Filter buttons */}
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "0.875rem", marginBottom: "1.5rem" }}>
                   {[{ key: "all", label: "Total", color: "#111827" }, { key: "pending", label: "Pending", color: "#b45309" }, { key: "approved", label: "Approved", color: "#15803d" }, { key: "rejected", label: "Rejected", color: "#dc2626" }].map(s => (
                     <button key={s.key} onClick={() => setGFilter(s.key)} style={{ background: gFilter === s.key ? "#111827" : "#ffffff", color: gFilter === s.key ? "#ffffff" : "#374151", border: `1px solid ${gFilter === s.key ? "#111827" : "#e5e7eb"}`, borderRadius: "10px", padding: "1rem", textAlign: "center", cursor: "pointer" }}>
@@ -638,9 +455,7 @@ export default function OwnerDashboard() {
                     </button>
                   ))}
                 </div>
-
                 {gSuccess && <div style={successBannerStyle}>✓ {gSuccess}</div>}
-
                 <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
                   {gLoading ? <LoadingSpinner /> : gError ? <ErrorState message={gError} /> :
                     gFiltered.length === 0 ? <div className="card" style={{ textAlign: "center", padding: "3rem", color: "var(--color-neutral-400)" }}>No guest entries in this category.</div>
@@ -661,25 +476,12 @@ export default function OwnerDashboard() {
                               <span>🕐 {g.visitTime}</span>
                             </div>
                           </div>
-                          <select
-                            defaultValue={g.status}
+                          <select defaultValue={g.status}
                             onChange={async (e) => {
-                              try {
-                                await guestLogAPI.updateStatus(g._id, e.target.value);
-                                setGSuccess("Status updated.");
-                                fetchGuestLogs();
-                                setTimeout(() => setGSuccess(""), 3000);
-                              } catch (err) { setGActionError(err.message); }
+                              try { await guestLogAPI.updateStatus(g._id, e.target.value); setGSuccess("Status updated."); fetchGuestLogs(); setTimeout(() => setGSuccess(""), 3000); }
+                              catch (err) { setGActionError(err.message); }
                             }}
-                            style={{
-                              padding: "0.45rem 0.75rem",
-                              border: `1px solid ${g.status === "approved" ? "#86efac" : g.status === "rejected" ? "#fca5a5" : "#d1d5db"}`,
-                              borderRadius: "8px", fontSize: "0.8125rem", fontWeight: "600",
-                              color: g.status === "approved" ? "#15803d" : g.status === "rejected" ? "#dc2626" : "#b45309",
-                              background: g.status === "approved" ? "#f0fdf4" : g.status === "rejected" ? "#fef2f2" : "#fefce8",
-                              outline: "none", cursor: "pointer",
-                            }}
-                          >
+                            style={{ padding: "0.45rem 0.75rem", border: `1px solid ${g.status === "approved" ? "#86efac" : g.status === "rejected" ? "#fca5a5" : "#d1d5db"}`, borderRadius: "8px", fontSize: "0.8125rem", fontWeight: "600", color: g.status === "approved" ? "#15803d" : g.status === "rejected" ? "#dc2626" : "#b45309", background: g.status === "approved" ? "#f0fdf4" : g.status === "rejected" ? "#fef2f2" : "#fefce8", outline: "none", cursor: "pointer" }}>
                             <option value="pending">Pending</option>
                             <option value="approved">Approved</option>
                             <option value="rejected">Rejected</option>
@@ -692,90 +494,98 @@ export default function OwnerDashboard() {
               </div>
             )}
 
-            {/* ── Utility Bills ─────────────────────────── */}
-            {othersSection === "bills" && (
-              <div>
+            {/* Daily Meal */}
+            {othersSection === "meal" && (
+              <div style={{ maxWidth: "1000px", margin: "0 auto" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "0.875rem", marginBottom: "1.5rem" }}>
-                  <button onClick={() => setOthersSection(null)}
-                    style={{ background: "#f3f4f6", border: "none", borderRadius: "8px", padding: "0.4rem 0.875rem", fontSize: "0.8125rem", fontWeight: "600", color: "#374151", cursor: "pointer" }}>
-                    ← Back
-                  </button>
+                  <button onClick={() => setOthersSection(null)} style={backBtnStyle}>← Back</button>
                   <div>
-                    <h3 style={{ margin: 0 }}>Utility Bills</h3>
-                    <p style={{ color: "var(--color-neutral-500)", fontSize: "0.875rem", marginTop: "0.125rem" }}>Enter monthly bills — they&apos;ll be split equally among all tenants.</p>
+                    <h3 style={{ margin: 0 }}>Daily Meal Tracking</h3>
+                    <p style={{ color: "var(--color-neutral-500)", fontSize: "0.875rem", marginTop: "0.125rem" }}>View today's menu and tenant preferences.</p>
                   </div>
                 </div>
 
-                {/* Bill entry form */}
-                <div className="card" style={{ marginBottom: "1.5rem" }}>
-                  <h4 style={{ marginBottom: "1.25rem" }}>Post a Utility Bill</h4>
-                  {billFormError   && <div style={{ background: "#fef2f2", border: "1px solid #fca5a5", borderRadius: "8px", padding: "0.75rem 1rem", marginBottom: "1rem", color: "#dc2626", fontSize: "0.875rem" }}>{billFormError}</div>}
-                  {billFormSuccess && <div style={successBannerStyle}>✓ {billFormSuccess}</div>}
-                  <form onSubmit={handleBillSubmit}>
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "1rem" }}>
-                      <div>
-                        <label style={panelLabelStyle}>Property *</label>
-                        <select value={billForm.propertyId} onChange={e => setBillForm({ ...billForm, propertyId: e.target.value })} style={selectStyle} required>
-                          <option value="">Select property…</option>
-                          {(properties.data?.properties ?? []).map(p => (
-                            <option key={p._id} value={p._id}>{p.title}</option>
-                          ))}
-                        </select>
+                <div className="card" style={{ marginBottom: "1.5rem", maxWidth: "600px", margin: "0 auto 1.5rem auto" }}>
+                  <label style={panelLabelStyle}>Select Property</label>
+                  <select value={mealPropFilter} onChange={e => setMealPropFilter(e.target.value)} style={selectStyle}>
+                    <option value="">Select a property...</option>
+                    {(properties.data?.properties ?? []).map(p => (
+                      <option key={p._id} value={p._id}>{p.title}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {mealPropFilter && (
+                  mealLoading ? <LoadingSpinner /> : (
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: "1.5rem" }}>
+                      <div className="card">
+                        <h4 style={{ marginBottom: "1rem", color: "#b45309" }}>Today's Menu</h4>
+                        <ul style={{ paddingLeft: "1.5rem", margin: 0, color: "#374151", lineHeight: "1.8" }}>
+                          {todayMenu.map((item, i) => <li key={i}><strong>{item}</strong></li>)}
+                        </ul>
                       </div>
-                      <div>
-                        <label style={panelLabelStyle}>Month *</label>
-                        <input type="month" value={billForm.month} onChange={e => setBillForm({ ...billForm, month: e.target.value })} style={selectStyle} required />
-                      </div>
-                      <div>
-                        <label style={panelLabelStyle}>Electricity (BDT)</label>
-                        <input type="number" min="0" value={billForm.electricity} onChange={e => setBillForm({ ...billForm, electricity: e.target.value })} placeholder="0" style={selectStyle} />
-                      </div>
-                      <div>
-                        <label style={panelLabelStyle}>Water (BDT)</label>
-                        <input type="number" min="0" value={billForm.water} onChange={e => setBillForm({ ...billForm, water: e.target.value })} placeholder="0" style={selectStyle} />
-                      </div>
-                      <div>
-                        <label style={panelLabelStyle}>Gas (BDT)</label>
-                        <input type="number" min="0" value={billForm.gas} onChange={e => setBillForm({ ...billForm, gas: e.target.value })} placeholder="0" style={selectStyle} />
-                      </div>
-                      <div>
-                        <label style={panelLabelStyle}>Internet (BDT)</label>
-                        <input type="number" min="0" value={billForm.internet} onChange={e => setBillForm({ ...billForm, internet: e.target.value })} placeholder="0" style={selectStyle} />
+                      <div className="card">
+                        <h4 style={{ marginBottom: "1rem" }}>Tenant Preferences</h4>
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
+                          <div>
+                            <p style={{ fontWeight: "600", color: "#15803d", marginBottom: "0.5rem" }}>Opted In (Yes) — {mealStats.yes.length}</p>
+                            <ul style={{ listStyle: "none", padding: 0, margin: 0, fontSize: "0.875rem", color: "#374151", lineHeight: "1.6" }}>
+                              {mealStats.yes.length === 0 ? <li style={{ color: "#9ca3af" }}>None</li> : mealStats.yes.map((name, i) => <li key={i}>✓ {name}</li>)}
+                            </ul>
+                          </div>
+                          <div>
+                            <p style={{ fontWeight: "600", color: "#dc2626", marginBottom: "0.5rem" }}>Opted Out (No) — {mealStats.no.length}</p>
+                            <ul style={{ listStyle: "none", padding: 0, margin: 0, fontSize: "0.875rem", color: "#374151", lineHeight: "1.6" }}>
+                              {mealStats.no.length === 0 ? <li style={{ color: "#9ca3af" }}>None</li> : mealStats.no.map((name, i) => <li key={i}>✕ {name}</li>)}
+                            </ul>
+                          </div>
+                        </div>
                       </div>
                     </div>
+                  )
+                )}
+              </div>
+            )}
+
+            {/* Post Notice */}
+            {othersSection === "notice" && (
+              <div style={{ maxWidth: "800px", margin: "0 auto" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "0.875rem", marginBottom: "1.5rem" }}>
+                  <button onClick={() => setOthersSection(null)} style={backBtnStyle}>← Back</button>
+                  <div>
+                    <h3 style={{ margin: 0 }}>Post Notice</h3>
+                    <p style={{ color: "var(--color-neutral-500)", fontSize: "0.875rem", marginTop: "0.125rem" }}>Send announcements to your tenants via email.</p>
+                  </div>
+                </div>
+
+                <div className="card">
+                  {noticePostError && <div style={errorBannerStyle}>{noticePostError}</div>}
+                  {noticePostSuccess && <div style={successBannerStyle}>✓ {noticePostSuccess}</div>}
+                  <form onSubmit={handleNoticeSubmit}>
+                    <div style={{ marginBottom: "1rem" }}>
+                      <label style={panelLabelStyle}>Property *</label>
+                      <select value={noticeForm.propertyId} onChange={e => setNoticeForm({ ...noticeForm, propertyId: e.target.value })} style={selectStyle} required>
+                        <option value="">Select a property...</option>
+                        {(properties.data?.properties ?? []).map(p => (
+                          <option key={p._id} value={p._id}>{p.title}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div style={{ marginBottom: "1rem" }}>
+                      <label style={panelLabelStyle}>Notice Title *</label>
+                      <input type="text" value={noticeForm.title} onChange={e => setNoticeForm({ ...noticeForm, title: e.target.value })} style={{ ...selectStyle, cursor: "text" }} placeholder="e.g. Water Supply Interruption" required />
+                    </div>
+                    <div style={{ marginBottom: "1.25rem" }}>
+                      <label style={panelLabelStyle}>Message *</label>
+                      <textarea value={noticeForm.message} onChange={e => setNoticeForm({ ...noticeForm, message: e.target.value })} style={{ ...selectStyle, cursor: "text", resize: "vertical", minHeight: "120px" }} placeholder="Write your announcement here..." required />
+                    </div>
                     <div style={{ display: "flex", justifyContent: "flex-end" }}>
-                      <button type="submit" disabled={billFormLoading} style={{ ...saveBtnStyle, opacity: billFormLoading ? 0.6 : 1 }}>
-                        {billFormLoading ? "Saving..." : "Post Bill & Split"}
+                      <button type="submit" disabled={noticePosting} style={{ ...saveBtnStyle, opacity: noticePosting ? 0.7 : 1 }}>
+                        {noticePosting ? "Posting..." : "Post Notice & Send Emails"}
                       </button>
                     </div>
                   </form>
                 </div>
-
-                {/* Past bills table */}
-                <h4 style={{ marginBottom: "1rem" }}>Past Bills</h4>
-                {propertyBills.length === 0 ? (
-                  <div className="card" style={{ textAlign: "center", padding: "2rem", color: "var(--color-neutral-400)" }}>No bills posted yet.</div>
-                ) : (
-                  <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-                    {propertyBills.map(b => (
-                      <div key={b._id} className="card" style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: "1rem", alignItems: "center" }}>
-                        <div>
-                          <div style={{ fontWeight: "600", marginBottom: "0.25rem" }}>{b.propertyId?.title ?? "—"} — {b.month}</div>
-                          <div style={{ display: "flex", gap: "1rem", flexWrap: "wrap", fontSize: "0.8125rem", color: "#6b7280" }}>
-                            {b.electricity > 0 && <span>⚡ BDT {b.electricity.toLocaleString()}</span>}
-                            {b.water       > 0 && <span>💧 BDT {b.water.toLocaleString()}</span>}
-                            {b.gas         > 0 && <span>🔥 BDT {b.gas.toLocaleString()}</span>}
-                            {b.internet    > 0 && <span>🌐 BDT {b.internet.toLocaleString()}</span>}
-                          </div>
-                        </div>
-                        <div style={{ textAlign: "right" }}>
-                          <div style={{ fontWeight: "700", color: "#111827" }}>Total: BDT {b.total?.toLocaleString()}</div>
-                          <div style={{ fontSize: "0.8rem", color: "#9ca3af", marginTop: "0.2rem" }}>Posted {fmtDate(b.createdAt)}</div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
               </div>
             )}
           </div>
@@ -791,4 +601,5 @@ const errorBannerStyle   = { background: "#fef2f2", border: "1px solid #fca5a5",
 const panelLabelStyle    = { margin: "0 0 0.5rem", fontSize: "0.8125rem", fontWeight: "600", color: "#374151" };
 const selectStyle        = { width: "100%", padding: "0.55rem 0.875rem", border: "1px solid #d1d5db", borderRadius: "8px", fontSize: "0.875rem", color: "#111827", background: "#ffffff", outline: "none", cursor: "pointer" };
 const saveBtnStyle       = { padding: "0.55rem 1.5rem", borderRadius: "8px", background: "#111827", color: "#ffffff", border: "none", fontWeight: "600", fontSize: "0.875rem", cursor: "pointer" };
+const backBtnStyle       = { background: "#f3f4f6", border: "none", borderRadius: "8px", padding: "0.4rem 0.875rem", fontSize: "0.8125rem", fontWeight: "600", color: "#374151", cursor: "pointer" };
 const hubBtnStyle        = { background: "#ffffff", border: "1px solid #e5e7eb", borderRadius: "16px", padding: "2rem 1.5rem", textAlign: "center", cursor: "pointer", boxShadow: "0 1px 3px rgba(0,0,0,0.06)" };

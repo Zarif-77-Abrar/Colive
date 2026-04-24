@@ -1,29 +1,20 @@
 import nodemailer from "nodemailer";
 
-// ── Transporter ────────────────────────────────────────────
-const transporter = nodemailer.createTransport({
-  service: "gmail",
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS,
-  },
-});
-
 // ── sendEmail ──────────────────────────────────────────────
-// Reusable email sender for any feature that needs it.
-//
-// Usage:
-//   await sendEmail({
-//     to:      "recipient@example.com",
-//     subject: "Emergency Alert",
-//     html:    "<p>...</p>",
-//   });
-
 export const sendEmail = async ({ to, subject, html, text }) => {
   if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
     console.warn("SMTP credentials not set — email not sent.");
     return;
   }
+
+  // Moved INSIDE the function so process.env is guaranteed to be loaded by dotenv
+  const transporter = nodemailer.createTransport({
+    service: "gmail",
+    auth: {
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASS,
+    },
+  });
 
   try {
     const info = await transporter.sendMail({
@@ -42,6 +33,8 @@ export const sendEmail = async ({ to, subject, html, text }) => {
 };
 
 // ── Email templates ────────────────────────────────────────
+
+// 1. Emergency Alert Template
 export const emergencyAlertEmail = ({ tenantName, ownerName, propertyTitle, roomLabel, customNote }) => ({
   subject: `🚨 Emergency Alert — ${propertyTitle}`,
   html: `
@@ -88,6 +81,27 @@ export const emergencyAlertEmail = ({ tenantName, ownerName, propertyTitle, room
         <p style="color: #9ca3af; font-size: 12px; text-align: center; margin: 0;">
           This alert was sent automatically by CoLive Housing Platform.
           Do not reply to this email.
+        </p>
+      </div>
+    </div>
+  `,
+});
+
+// 2. Notice Template
+export const noticeEmail = ({ title, message, propertyTitle }) => ({
+  subject: `📢 New Notice: ${title}`,
+  html: `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; background: #f9fafb; border-radius: 8px;">
+      <div style="background: #fff; border-radius: 8px; padding: 32px; border: 1px solid #e5e7eb;">
+        <h2 style="color: #111827; margin-top: 0;">${title}</h2>
+        <p style="color: #6b7280; font-size: 13px;">📍 ${propertyTitle}</p>
+        
+        <div style="background: #f3f4f6; padding: 16px; border-radius: 4px; margin: 20px 0;">
+          <p style="color: #374151; font-size: 15px; margin: 0; white-space: pre-wrap;">${message}</p>
+        </div>
+        
+        <p style="color: #9ca3af; font-size: 12px; text-align: center; margin: 0;">
+          Sent automatically by CoLive Platform
         </p>
       </div>
     </div>

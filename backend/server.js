@@ -13,12 +13,13 @@ import paymentRoutes        from "./routes/paymentRoutes.js";
 import maintenanceRoutes    from "./routes/maintenanceRoutes.js";
 import guestLogRoutes       from "./routes/guestLogRoutes.js";
 import noticeRoutes         from "./routes/noticeRoutes.js";
+import mealRoutes           from "./routes/mealRoutes.js";
 import compatibilityRoutes  from "./routes/compatibilityRoutes.js";
 import conversationRoutes   from "./routes/conversationRoutes.js";
 import utilityBillRoutes    from "./routes/utilityBillRoutes.js";
 import agreementRoutes      from "./routes/agreementRoutes.js";
 import { stripeWebhook }    from "./controllers/paymentController.js";
-import alertRoutes         from "./routes/alertRoutes.js";
+import alertRoutes          from "./routes/alertRoutes.js";
 
 dns.setServers(["1.1.1.1", "8.8.8.8"]);
 dotenv.config({ override: true });
@@ -48,11 +49,12 @@ app.use("/api/payments",      paymentRoutes);
 app.use("/api/maintenance",   maintenanceRoutes);
 app.use("/api/guests",        guestLogRoutes);
 app.use("/api/notices",       noticeRoutes);
+app.use("/api/meals",         mealRoutes);
 app.use("/api/compatibility", compatibilityRoutes);
 app.use("/api/conversations", conversationRoutes);
 app.use("/api/bills",         utilityBillRoutes);
 app.use("/api/agreements",    agreementRoutes);
-app.use("/api/alerts",         alertRoutes);
+app.use("/api/alerts",        alertRoutes);
 
 app.get("/api/health", (req, res) => res.json({ status: "CoLive API running" }));
 

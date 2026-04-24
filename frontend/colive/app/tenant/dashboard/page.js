@@ -10,16 +10,11 @@ import DataTable from "../../../components/DataTable";
 import { LoadingSpinner, ErrorState } from "../../../components/LoadingState";
 import useApi from "../../../lib/useApi";
 import useFCM from "../../../lib/useFCM";
-import { getUser, bookingAPI, paymentAPI, maintenanceAPI, userAPI, propertyAPI, guestLogAPI, utilityBillAPI, agreementAPI } from "../../../lib/api";
-
-const TABS = [
-  { key: "overview",    label: "Overview"    },
-  { key: "bookings",    label: "My Bookings" },
-  { key: "payments",    label: "My Payments" },
-  { key: "maintenance", label: "Maintenance" },
-  { key: "messages",    label: "Messages"    },
-  { key: "others",      label: "Others"      },
-];
+import { 
+  getUser, bookingAPI, paymentAPI, maintenanceAPI, 
+  userAPI, propertyAPI, guestLogAPI, utilityBillAPI, 
+  agreementAPI, noticeAPI, mealAPI 
+} from "../../../lib/api";
 
 const fmtDate  = (d) => d ? new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "—";
 const fmtMoney = (n) => n != null ? `BDT ${Number(n).toLocaleString()}` : "—";
@@ -51,16 +46,11 @@ const Badge = ({ meta }) => (
   }}>{meta.label}</span>
 );
 
-// ── Maintenance form constants ─────────────────────────────
 const EMPTY_MFORM = { title: "", description: "", category: "other", priority: "medium", propertyId: "", roomId: "" };
-
-// ── Guest log form constants ───────────────────────────────
 const EMPTY_GFORM = {
   guestName: "", relationship: "", purpose: "", propertyId: "",
   visitDate: "", hour: "10", minute: "00", ampm: "AM",
 };
-
-// Generate arrays for time dropdowns
 const HOURS   = Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, "0"));
 const MINUTES = Array.from({ length: 60 }, (_, i) => String(i).padStart(2, "0"));
 
@@ -75,12 +65,17 @@ export default function TenantDashboard() {
   const [monthFilter, setMonthFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
 
-  // useFCM();
+  const [noticeUnread, setNoticeUnread] = useState(0);
 
-  // ── Others sub-section ─────────────────────────────────
-  const [othersSection, setOthersSection] = useState(null); // null | "guest"
+  const [todayMenu, setTodayMenu] = useState([]);
+  const [mealPref, setMealPref] = useState(true);
+  const [mealLoading, setMealLoading] = useState(false);
 
-  // ── Maintenance state ──────────────────────────────────
+  const [tenantNotices, setTenantNotices] = useState([]);
+  const [noticeLoading, setNoticeLoading] = useState(false);
+
+  const [othersSection, setOthersSection] = useState(null);
+
   const [mRequests, setMRequests]   = useState([]);
   const [mLoading, setMLoading]     = useState(false);
   const [mError, setMError]         = useState("");
@@ -94,7 +89,6 @@ export default function TenantDashboard() {
   const [selectedProperty, setSelectedProperty] = useState(null);
   const [showSuggestions, setShowSuggestions]   = useState(false);
 
-  // ── Guest log state ────────────────────────────────────
   const [gLogs, setGLogs]           = useState([]);
   const [gLoading, setGLoading]     = useState(false);
   const [gError, setGError]         = useState("");
@@ -107,20 +101,53 @@ export default function TenantDashboard() {
   const [gSelectedProperty, setGSelectedProperty] = useState(null);
   const [showGSuggestions, setShowGSuggestions]   = useState(false);
 
+  const TABS = [
+    { key: "overview",    label: "Overview"    },
+    { key: "bookings",    label: "My Bookings" },
+    { key: "payments",    label: "My Payments" },
+    { key: "maintenance", label: "Maintenance" },
+    { key: "messages",    label: "Messages"    },
+    { key: "others",      label: noticeUnread > 0 ? "Others 🔴" : "Others" },
+  ];
+
   useEffect(() => {
     const u = getUser();
     if (!u) { router.push("/login"); return; }
     if (u.role !== "tenant") { router.push("/login"); return; }
     setUser(u);
 
-    // Fetch full profile to get preferences (localStorage doesn't include them)
     userAPI.getProfile()
       .then((data) => setProfile(data.user))
       .catch(() => setProfile(null));
+
+    noticeAPI.getTenant()
+      .then((data) => setNoticeUnread(data.unreadCount ?? 0))
+      .catch(() => {});
   }, [router]);
 
   const bookings = useApi(bookingAPI.getMy);
   const payments = useApi(paymentAPI.getMy);
+
+  useEffect(() => {
+    const acceptedBooking = bookings.data?.bookings?.find(b => b.status === "accepted");
+    if (user && acceptedBooking) {
+      const propId = acceptedBooking.propertyId?._id || acceptedBooking.propertyId;
+      
+      setNoticeLoading(true);
+      noticeAPI.getTenant()
+        .then(d => setTenantNotices(d.notices || []))
+        .finally(() => setNoticeLoading(false));
+
+      setMealLoading(true);
+      mealAPI.getMenu(propId)
+        .then(d => setTodayMenu(d.menu?.items || []))
+        .catch(() => setTodayMenu([]));
+        
+      mealAPI.getMyPreference()
+        .then(d => setMealPref(d.mealEnabled))
+        .finally(() => setMealLoading(false));
+    }
+  }, [user, bookings.data]);
 
   const fetchMaintenance = useCallback(async () => {
     setMLoading(true); setMError("");
@@ -143,7 +170,6 @@ export default function TenantDashboard() {
     }
   };
 
-  // Utility Bills state
   const [billSplits,    setBillSplits]    = useState([]);
   const [billLoading,   setBillLoading]   = useState(false);
   const [billError,     setBillError]     = useState("");
@@ -160,7 +186,7 @@ export default function TenantDashboard() {
       await utilityBillAPI.markPaid(splitId);
       setBillSuccess("Marked as paid!");
       fetchBillSplits();
-      payments.refetch(); // backend now creates a Payment record — update history too
+      payments.refetch();
       setTimeout(() => setBillSuccess(""), 3000);
     } catch (err) {
       alert(err.message || "Failed to mark as paid.");
@@ -196,25 +222,20 @@ export default function TenantDashboard() {
     (p) =>
       p.month === currentMonth &&
       p.paymentStatus === "paid" &&
-      p.amount > 0 &&          // must be a rent payment, not utility-only
+      p.amount > 0 &&
       currentRoomId &&
       (p.roomId?._id || p.roomId)?.toString() === currentRoomId
   );
 
-  // After Stripe redirects back with ?payment=success&session_id=...,
-  // call verifySession to directly confirm payment with Stripe and update the DB.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const sessionId = params.get("session_id");
     const paymentParam = params.get("payment");
 
     if (paymentParam === "success" && sessionId) {
-      // Call backend to verify and mark as paid — no reliance on webhooks
       paymentAPI.verifySession(sessionId)
         .then(() => {
-          // Clean up the URL params
           window.history.replaceState({}, "", "/tenant/dashboard?tab=payments");
-          // Refetch payments AND bill splits to show updated statuses
           payments.refetch();
           fetchBillSplits();
         })
@@ -224,12 +245,11 @@ export default function TenantDashboard() {
           fetchBillSplits();
         });
     }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   const handlePayNow = async () => {
     setPaying(true);
     try {
-      // Always use the ACCEPTED booking, not just the first one
       const activeBooking = (bookings.data?.bookings ?? []).find(
         (b) => b.status === "accepted"
       );
@@ -239,7 +259,6 @@ export default function TenantDashboard() {
         return;
       }
 
-      // Find an unpaid utility bill split for the current month
       const unpaidBillSplit = billSplits.find(
         (s) => s.status === "unpaid" && s.billId?.month === currentMonth
       );
@@ -286,7 +305,6 @@ export default function TenantDashboard() {
       window.location.reload();
     } catch (err) {
       console.error(err);
-      // Show the backend's specific message (e.g. unpaid rent)
       alert(err.message || "Failed to leave room.");
     }
   };
@@ -300,7 +318,6 @@ export default function TenantDashboard() {
     if (user) { fetchMaintenance(); fetchProperties(); fetchGuestLogs(); fetchBillSplits(); }
   }, [user, fetchMaintenance, fetchProperties, fetchGuestLogs, fetchBillSplits]);
 
-  // ── Maintenance property search ────────────────────────
   const handlePropertySearch = (e) => {
     setPropertySearch(e.target.value); setSelectedProperty(null);
     setMForm({ ...mForm, propertyId: "" }); setShowSuggestions(true);
@@ -315,7 +332,6 @@ export default function TenantDashboard() {
         p.city.toLowerCase().includes(propertySearch.toLowerCase())
       ).slice(0, 6) : [];
 
-  // ── Guest log property search ──────────────────────────
   const handleGPropertySearch = (e) => {
     setGPropertySearch(e.target.value); setGSelectedProperty(null);
     setGForm({ ...gForm, propertyId: "" }); setShowGSuggestions(true);
@@ -330,18 +346,18 @@ export default function TenantDashboard() {
         p.city.toLowerCase().includes(gPropertySearch.toLowerCase())
       ).slice(0, 6) : [];
 
-  // ── Maintenance submit ─────────────────────────────────
   const handleMSubmit = async (e) => {
     e.preventDefault();
-    if (!mForm.title.trim() || !mForm.description.trim() || !mForm.propertyId) {
-      setMFormError("Title, description, and Property are required."); return;
+    // ← CHANGED: Made Room Label checking mandatory locally as well
+    if (!mForm.title.trim() || !mForm.description.trim() || !mForm.propertyId || !mForm.roomId.trim()) {
+      setMFormError("Title, description, Property, and Room Label are required."); return;
     }
     setMSubmitting(true); setMFormError("");
     try {
       await maintenanceAPI.create({
         title: mForm.title.trim(), description: mForm.description.trim(),
         category: mForm.category, priority: mForm.priority,
-        propertyId: mForm.propertyId, roomLabel: mForm.roomId.trim() || undefined,
+        propertyId: mForm.propertyId, roomLabel: mForm.roomId.trim(), // ← CHANGED
       });
       setMSuccess("Request submitted!"); setMForm(EMPTY_MFORM);
       setPropertySearch(""); setSelectedProperty(null); setShowMForm(false);
@@ -350,7 +366,6 @@ export default function TenantDashboard() {
     finally { setMSubmitting(false); }
   };
 
-  // ── Guest log submit ───────────────────────────────────
   const handleGSubmit = async (e) => {
     e.preventDefault();
     if (!gForm.guestName.trim() || !gForm.purpose.trim() || !gForm.propertyId || !gForm.visitDate) {
@@ -382,7 +397,6 @@ export default function TenantDashboard() {
   const pendingBookings   = bookings.data?.bookings?.filter(b => b.status === "pending").length ?? 0;
   const paidThisMonth    =  payments.data?.payments?.filter(p => p.paymentStatus === "paid" && new Date(p.paidAt).getMonth() === new Date().getMonth()).length ?? 0;
   const openMaintenance = mRequests.filter(r => r.status !== "resolved").length;
-  // const openMaintenance   = maintenance.data?.requests?.filter(r => r.status !== "resolved").length ?? 0;
 
   return (
     <div style={{ minHeight: "100vh", background: "var(--color-neutral-50)" }}>
@@ -399,7 +413,6 @@ export default function TenantDashboard() {
               Here&apos;s a summary of your housing activity.
             </p>
 
-            {/* ── Preferences incomplete warning ─────────── */}
             {profile && !hasPreferences && (
               <div style={{
                 background: "var(--color-warning-50)",
@@ -428,11 +441,9 @@ export default function TenantDashboard() {
               </div>
             )}
 
-            {/* ── Primary action — search or manage ─────── */}
             {bookings.loading ? null : (
               <div className="card" style={{ marginBottom: "1.5rem" }}>
                 {hasActiveRoom ? (
-                  /* Tenant has an accepted booking — show room info + manage button */
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "1rem" }}>
                     <div>
                       <p style={{ fontSize: "0.75rem", fontWeight: "600", color: "var(--color-neutral-400)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: "0.375rem" }}>
@@ -462,7 +473,6 @@ export default function TenantDashboard() {
                     </div>
                   </div>
                 ) : (
-                  /* No accepted booking — prompt to search */
                   <div style={{ textAlign: "center", padding: "1.5rem 1rem" }}>
                     <p style={{ fontWeight: "600", fontSize: "1.125rem", color: "var(--color-neutral-900)", marginBottom: "0.5rem" }}>
                       You are not in a room yet
@@ -491,7 +501,6 @@ export default function TenantDashboard() {
               </div>
             )}
 
-            {/* ── Stat cards ────────────────────────────── */}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "1rem", marginBottom: "2rem" }}>
               <StatCard label="Booking requests"    value={bookings.data?.count ?? "—"} sub={`${pendingBookings} pending`} accent="primary" />
               <StatCard label="Payments this month" value={paidThisMonth}               sub="paid"                         accent="success" />
@@ -564,7 +573,6 @@ export default function TenantDashboard() {
                               </p>
                             )}
                           </div>
-                          {/* Download Agreement — only for accepted bookings */}
                           {b.status === "accepted" && (
                             <button
                               onClick={() => handleDownloadAgreement(b._id)}
@@ -636,14 +644,12 @@ export default function TenantDashboard() {
               })()}
             </div>
 
-            {/* ── Utility bill notice / standalone pay button ── */}
             {(() => {
               const unpaidBillThisMonth = billSplits.find(
                 (s) => s.status === "unpaid" && s.billId?.month === currentMonth
               );
               if (!unpaidBillThisMonth) return null;
 
-              // Rent is NOT yet paid → combined notice (bill will be included with rent)
               if (!alreadyPaidForTestRoom) {
                 const activeBooking = (bookings.data?.bookings ?? []).find(
                   (b) => b.status === "accepted"
@@ -670,7 +676,6 @@ export default function TenantDashboard() {
                 );
               }
 
-              // Rent IS already paid → show standalone utility payment button
               return (
                 <div style={{
                   background: "#fff7ed", border: "1px solid #fb923c",
@@ -720,54 +725,23 @@ export default function TenantDashboard() {
               }}
             >
               <div>
-                <label
-                  style={{
-                    display: "block",
-                    fontSize: "0.85rem",
-                    marginBottom: "0.35rem",
-                    color: "var(--color-neutral-600)",
-                  }}
-                >
+                <label style={{ display: "block", fontSize: "0.85rem", marginBottom: "0.35rem", color: "var(--color-neutral-600)" }}>
                   Filter by month
                 </label>
-                <input
-                  type="month"
-                  value={monthFilter}
-                  onChange={(e) => setMonthFilter(e.target.value)}
-                  className="input"
-                />
+                <input type="month" value={monthFilter} onChange={(e) => setMonthFilter(e.target.value)} className="input" />
               </div>
-
               <div>
-                <label
-                  style={{
-                    display: "block",
-                    fontSize: "0.85rem",
-                    marginBottom: "0.35rem",
-                    color: "var(--color-neutral-600)",
-                  }}
-                >
+                <label style={{ display: "block", fontSize: "0.85rem", marginBottom: "0.35rem", color: "var(--color-neutral-600)" }}>
                   Filter by status
                 </label>
-                <select
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
-                  className="input"
-                >
+                <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="input">
                   <option value="">All</option>
                   <option value="paid">Paid</option>
                   <option value="pending">Pending</option>
                   <option value="failed">Failed</option>
                 </select>
               </div>
-
-              <button
-                className="btn btn-ghost"
-                onClick={() => {
-                  setMonthFilter("");
-                  setStatusFilter("");
-                }}
-              >
+              <button className="btn btn-ghost" onClick={() => { setMonthFilter(""); setStatusFilter(""); }}>
                 Reset filters
               </button>
             </div>
@@ -791,7 +765,7 @@ export default function TenantDashboard() {
 
         {/* ── Maintenance ────────────────────────────────── */}
         {active === "maintenance" && (
-          <div>
+          <div style={{ maxWidth: "1000px", margin: "0 auto" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "1.5rem", flexWrap: "wrap", gap: "1rem" }}>
               <div>
                 <h3 style={{ margin: 0 }}>Maintenance Requests</h3>
@@ -865,7 +839,8 @@ export default function TenantDashboard() {
                       )}
                     </div>
                     <div>
-                      <label style={labelStyle}>Room Label <span style={{ color: "#9ca3af", fontWeight: "400" }}>(optional)</span></label>
+                      {/* ← CHANGED: Room label is now strictly required visually */}
+                      <label style={labelStyle}>Room Label *</label>
                       <input name="roomId" value={mForm.roomId} onChange={e => setMForm({ ...mForm, roomId: e.target.value })} placeholder="e.g. Room 3A" style={inputStyle} />
                     </div>
                     <div style={{ gridColumn: "1 / -1" }}>
@@ -909,7 +884,6 @@ export default function TenantDashboard() {
                       <span>📅 {fmtDate(r.createdAt)}</span>
                       {r.technicianName && <span>🔧 {r.technicianName}</span>}
                     </div>
-                    {/* Show Mark as Done button if work has started but tenant hasn't confirmed yet */}
                     {(r.status === "in_progress" || r.status === "resolved") && !r.tenantConfirmed && (
                       <div style={{ marginTop: "0.75rem", paddingTop: "0.75rem", borderTop: "1px solid #f3f4f6" }}>
                         <button
@@ -938,7 +912,6 @@ export default function TenantDashboard() {
         {/* ── Others ─────────────────────────────────────── */}
         {active === "others" && (
           <div>
-            {/* Hub — shown when no section is selected */}
             {!othersSection && (
               <div>
                 <h3 style={{ marginBottom: "0.25rem" }}>Others</h3>
@@ -946,7 +919,7 @@ export default function TenantDashboard() {
                   Manage guest visits and other housing services.
                 </p>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "1.25rem" }}>
-                  {/* Guest Entry Log — functional */}
+
                   <button onClick={() => setOthersSection("guest")} style={hubBtnStyle}>
                     <div style={{ fontSize: "2rem", marginBottom: "0.75rem" }}>🚪</div>
                     <div style={{ fontWeight: "700", fontSize: "1rem", color: "#111827", marginBottom: "0.375rem" }}>Guest Entry Log</div>
@@ -955,7 +928,6 @@ export default function TenantDashboard() {
                     </div>
                   </button>
 
-                  {/* Utility Bills */}
                   <button onClick={() => { setOthersSection("bills"); fetchBillSplits(); }} style={hubBtnStyle}>
                     <div style={{ fontSize: "2rem", marginBottom: "0.75rem" }}>⚡</div>
                     <div style={{ fontWeight: "700", fontSize: "1rem", color: "#111827", marginBottom: "0.375rem" }}>Utility Bills</div>
@@ -964,31 +936,36 @@ export default function TenantDashboard() {
                     </div>
                   </button>
 
-                  {/* Daily Meal — placeholder */}
-                  <div style={{ ...hubBtnStyle, opacity: 0.5, cursor: "not-allowed" }}>
+                  {/* ── Daily Meal ── */}
+                  <button onClick={() => setOthersSection("meal")} style={hubBtnStyle}>
                     <div style={{ fontSize: "2rem", marginBottom: "0.75rem" }}>🍽️</div>
                     <div style={{ fontWeight: "700", fontSize: "1rem", color: "#111827", marginBottom: "0.375rem" }}>Daily Meal</div>
                     <div style={{ fontSize: "0.8125rem", color: "#6b7280", lineHeight: "1.5" }}>
-                      Coming soon.
+                      View today&apos;s menu and set your meal preference.
                     </div>
-                  </div>
+                  </button>
 
-                  {/* Check Notice — placeholder */}
-                  <div style={{ ...hubBtnStyle, opacity: 0.5, cursor: "not-allowed" }}>
+                  {/* ── Check Notice ── */}
+                  <button onClick={() => setOthersSection("notice")} style={{ ...hubBtnStyle, position: "relative" }}>
+                    {noticeUnread > 0 && (
+                      <span style={{ position: "absolute", top: "12px", right: "12px", width: "10px", height: "10px", borderRadius: "50%", background: "#dc2626" }} />
+                    )}
                     <div style={{ fontSize: "2rem", marginBottom: "0.75rem" }}>📢</div>
-                    <div style={{ fontWeight: "700", fontSize: "1rem", color: "#111827", marginBottom: "0.375rem" }}>Check Notice</div>
-                    <div style={{ fontSize: "0.8125rem", color: "#6b7280", lineHeight: "1.5" }}>
-                      Coming soon.
+                    <div style={{ fontWeight: "700", fontSize: "1rem", color: "#111827", marginBottom: "0.375rem" }}>
+                      Check Notice {noticeUnread > 0 && <span style={{ color: "#dc2626" }}>({noticeUnread})</span>}
                     </div>
-                  </div>
+                    <div style={{ fontSize: "0.8125rem", color: "#6b7280", lineHeight: "1.5" }}>
+                      View notices from your property owner.
+                    </div>
+                  </button>
+
                 </div>
               </div>
             )}
 
             {/* Guest Entry Log section */}
             {othersSection === "guest" && (
-              <div>
-                {/* Back + header */}
+              <div style={{ maxWidth: "1000px", margin: "0 auto" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "1.5rem", flexWrap: "wrap", gap: "1rem" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: "0.875rem" }}>
                     <button onClick={() => { setOthersSection(null); setShowGForm(false); setGForm(EMPTY_GFORM); setGPropertySearch(""); setGSelectedProperty(null); }}
@@ -1006,7 +983,6 @@ export default function TenantDashboard() {
                   </button>
                 </div>
 
-                {/* Stats */}
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "1rem", marginBottom: "1.5rem" }}>
                   {[
                     { label: "Total",    value: gLogs.length,                                       color: "#111827" },
@@ -1022,36 +998,27 @@ export default function TenantDashboard() {
 
                 {gSuccess && <div style={successBannerStyle}>✓ {gSuccess}</div>}
 
-                {/* Guest form */}
                 {showGForm && (
                   <div className="card" style={{ marginBottom: "1.5rem" }}>
                     <h4 style={{ marginBottom: "1.25rem" }}>Register a guest</h4>
                     {gFormError && <div style={errorBannerStyle}>{gFormError}</div>}
                     <form onSubmit={handleGSubmit}>
                       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "1rem" }}>
-
-                        {/* Guest name */}
                         <div>
                           <label style={labelStyle}>Guest Name *</label>
                           <input value={gForm.guestName} onChange={e => { setGForm({ ...gForm, guestName: e.target.value }); setGFormError(""); }}
                             placeholder="Full name of guest" style={inputStyle} />
                         </div>
-
-                        {/* Relationship */}
                         <div>
                           <label style={labelStyle}>Relationship</label>
                           <input value={gForm.relationship} onChange={e => setGForm({ ...gForm, relationship: e.target.value })}
                             placeholder="e.g. Friend, Parent, Sibling" style={inputStyle} />
                         </div>
-
-                        {/* Purpose */}
                         <div>
                           <label style={labelStyle}>Purpose of Visit *</label>
                           <input value={gForm.purpose} onChange={e => { setGForm({ ...gForm, purpose: e.target.value }); setGFormError(""); }}
                             placeholder="e.g. Family visit, Study" style={inputStyle} />
                         </div>
-
-                        {/* Property search — right of Purpose */}
                         <div style={{ position: "relative" }}>
                           <label style={labelStyle}>Property *</label>
                           <input value={gPropertySearch} onChange={handleGPropertySearch}
@@ -1077,16 +1044,12 @@ export default function TenantDashboard() {
                             </div>
                           )}
                         </div>
-
-                        {/* Visit date */}
                         <div>
                           <label style={labelStyle}>Visit Date *</label>
                           <input type="date" value={gForm.visitDate}
                             onChange={e => { setGForm({ ...gForm, visitDate: e.target.value }); setGFormError(""); }}
                             style={inputStyle} />
                         </div>
-
-                        {/* Visit time */}
                         <div>
                           <label style={labelStyle}>Visit Time *</label>
                           <div style={{ display: "flex", gap: "0.5rem" }}>
@@ -1102,7 +1065,6 @@ export default function TenantDashboard() {
                             </select>
                           </div>
                         </div>
-
                       </div>
                       <div style={{ display: "flex", gap: "0.75rem", justifyContent: "flex-end" }}>
                         <button type="button" onClick={() => { setShowGForm(false); setGForm(EMPTY_GFORM); setGPropertySearch(""); setGSelectedProperty(null); }}
@@ -1116,7 +1078,6 @@ export default function TenantDashboard() {
                   </div>
                 )}
 
-                {/* Guest logs list */}
                 <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
                   {gLoading ? <LoadingSpinner /> : gError ? <ErrorState message={gError} /> :
                     gLogs.length === 0 ? (
@@ -1148,9 +1109,9 @@ export default function TenantDashboard() {
               </div>
             )}
 
-            {/* ── Utility Bills section ─────────────────── */}
+            {/* Utility Bills section */}
             {othersSection === "bills" && (
-              <div>
+              <div style={{ maxWidth: "1000px", margin: "0 auto" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "0.875rem", marginBottom: "1.5rem" }}>
                   <button onClick={() => setOthersSection(null)}
                     style={{ background: "#f3f4f6", border: "none", borderRadius: "8px", padding: "0.4rem 0.875rem", fontSize: "0.8125rem", fontWeight: "600", color: "#374151", cursor: "pointer" }}>
@@ -1163,8 +1124,6 @@ export default function TenantDashboard() {
                     </p>
                   </div>
                 </div>
-
-                {/* Summary stats */}
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "1rem", marginBottom: "1.5rem" }}>
                   {[
                     { label: "Total Bills", value: billSplits.length,                                     color: "#111827" },
@@ -1177,9 +1136,7 @@ export default function TenantDashboard() {
                     </div>
                   ))}
                 </div>
-
                 {billSuccess && <div style={successBannerStyle}>✓ {billSuccess}</div>}
-
                 {billLoading ? <LoadingSpinner /> : billError ? <ErrorState message={billError} /> :
                   billSplits.length === 0 ? (
                     <div className="card" style={{ textAlign: "center", padding: "3rem", color: "var(--color-neutral-400)" }}>
@@ -1194,66 +1151,35 @@ export default function TenantDashboard() {
                           <div key={s._id} className="card">
                             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "1rem" }}>
                               <div style={{ flex: 1, minWidth: 0 }}>
-                                {/* Title row */}
                                 <div style={{ display: "flex", alignItems: "center", gap: "0.625rem", marginBottom: "0.5rem", flexWrap: "wrap" }}>
                                   <span style={{ fontWeight: "600", fontSize: "0.9375rem", color: "#111827" }}>
                                     {bill?.propertyId?.title ?? "Property"} — {bill?.month ?? "—"}
                                   </span>
-                                  <span style={{
-                                    display: "inline-block", padding: "0.2rem 0.6rem", borderRadius: "999px",
-                                    fontSize: "0.75rem", fontWeight: "600",
-                                    color: isPaid ? "#15803d" : "#b45309",
-                                    background: isPaid ? "#dcfce7" : "#fef3c7",
-                                  }}>{isPaid ? "Paid" : "Unpaid"}</span>
+                                  <span style={{ display: "inline-block", padding: "0.2rem 0.6rem", borderRadius: "999px", fontSize: "0.75rem", fontWeight: "600", color: isPaid ? "#15803d" : "#b45309", background: isPaid ? "#dcfce7" : "#fef3c7" }}>
+                                    {isPaid ? "Paid" : "Unpaid"}
+                                  </span>
                                 </div>
-
-                                {/* Bill breakdown */}
                                 <div style={{ display: "flex", gap: "1.25rem", flexWrap: "wrap", fontSize: "0.8125rem", color: "#6b7280", marginBottom: "0.625rem" }}>
                                   {bill?.electricity > 0 && <span>⚡ Electricity: BDT {bill.electricity.toLocaleString()}</span>}
                                   {bill?.water       > 0 && <span>💧 Water: BDT {bill.water.toLocaleString()}</span>}
                                   {bill?.gas         > 0 && <span>🔥 Gas: BDT {bill.gas.toLocaleString()}</span>}
                                   {bill?.internet    > 0 && <span>🌐 Internet: BDT {bill.internet.toLocaleString()}</span>}
                                 </div>
-
-                                {/* Share summary */}
                                 <div style={{ fontSize: "0.875rem", color: "#374151" }}>
                                   Total bill: <strong>BDT {bill?.total?.toLocaleString() ?? "—"}</strong>
                                   <span style={{ color: "#d1d5db", margin: "0 0.5rem" }}>·</span>
                                   Your share: <strong style={{ color: "#1d4ed8", fontSize: "1rem" }}>BDT {s.amount?.toLocaleString()}</strong>
                                 </div>
                               </div>
-
-                              {/* Action */}
                               <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "0.5rem" }}>
                                 {!isPaid ? (
                                   <>
-                                    {/* Primary: pay through Stripe */}
-                                    <button
-                                      onClick={() => handlePayUtilityNow(s._id)}
-                                      disabled={payingUtility}
-                                      style={{
-                                        background: "#1d4ed8", color: "#fff",
-                                        border: "none", borderRadius: "8px",
-                                        padding: "0.5rem 1.25rem",
-                                        fontWeight: "600", fontSize: "0.8125rem",
-                                        cursor: payingUtility ? "not-allowed" : "pointer",
-                                        opacity: payingUtility ? 0.65 : 1,
-                                        whiteSpace: "nowrap",
-                                      }}
-                                    >
+                                    <button onClick={() => handlePayUtilityNow(s._id)} disabled={payingUtility}
+                                      style={{ background: "#1d4ed8", color: "#fff", border: "none", borderRadius: "8px", padding: "0.5rem 1.25rem", fontWeight: "600", fontSize: "0.8125rem", cursor: payingUtility ? "not-allowed" : "pointer", opacity: payingUtility ? 0.65 : 1, whiteSpace: "nowrap" }}>
                                       {payingUtility ? "Redirecting..." : `💳 Pay BDT ${s.amount?.toLocaleString()}`}
                                     </button>
-                                    {/* Secondary: manual / cash acknowledgment */}
-                                    <button
-                                      onClick={() => handleMarkBillPaid(s._id)}
-                                      style={{
-                                        background: "transparent", color: "#6b7280",
-                                        border: "1px solid #d1d5db", borderRadius: "8px",
-                                        padding: "0.35rem 0.875rem",
-                                        fontWeight: "500", fontSize: "0.75rem",
-                                        cursor: "pointer",
-                                      }}
-                                    >
+                                    <button onClick={() => handleMarkBillPaid(s._id)}
+                                      style={{ background: "transparent", color: "#6b7280", border: "1px solid #d1d5db", borderRadius: "8px", padding: "0.35rem 0.875rem", fontWeight: "500", fontSize: "0.75rem", cursor: "pointer" }}>
                                       Mark as paid (cash)
                                     </button>
                                   </>
@@ -1270,6 +1196,76 @@ export default function TenantDashboard() {
                 }
               </div>
             )}
+
+            {/* ── Daily Meal ─────────────────────────────────── */}
+            {othersSection === "meal" && (
+              <div style={{ maxWidth: "1000px", margin: "0 auto" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "0.875rem", marginBottom: "1.5rem" }}>
+                  <button onClick={() => setOthersSection(null)} style={{ background: "#f3f4f6", border: "none", borderRadius: "8px", padding: "0.4rem 0.875rem", fontSize: "0.8125rem", fontWeight: "600", color: "#374151", cursor: "pointer" }}>← Back</button>
+                  <div>
+                    <h3 style={{ margin: 0 }}>Daily Meal Menu</h3>
+                    <p style={{ color: "var(--color-neutral-500)", fontSize: "0.875rem", marginTop: "0.125rem" }}>View today's menu and set your preference.</p>
+                  </div>
+                </div>
+                {mealLoading ? <LoadingSpinner /> : (
+                  <div className="card" style={{ maxWidth: "500px", margin: "0 auto" }}>
+                    <h4 style={{ marginBottom: "1rem", color: "#b45309" }}>Today's Menu</h4>
+                    <ul style={{ paddingLeft: "1.5rem", marginBottom: "2rem", color: "#374151", lineHeight: "1.8" }}>
+                      {todayMenu.map((item, i) => <li key={i}><strong>{item}</strong></li>)}
+                    </ul>
+                    <div style={{ padding: "1rem", background: "#f9fafb", borderRadius: "8px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "1rem" }}>
+                      <span style={{ fontWeight: "600" }}>Will you be having today's meal?</span>
+                      <div style={{ display: "flex", gap: "0.5rem" }}>
+                        <button 
+                          onClick={() => { setMealPref(true); mealAPI.togglePreference(true); }} 
+                          style={{ padding: "0.5rem 1rem", borderRadius: "6px", border: "none", fontWeight: "600", cursor: "pointer", background: mealPref ? "#15803d" : "#e5e7eb", color: mealPref ? "#fff" : "#374151" }}
+                        >
+                          Yes
+                        </button>
+                        <button 
+                          onClick={() => { setMealPref(false); mealAPI.togglePreference(false); }} 
+                          style={{ padding: "0.5rem 1rem", borderRadius: "6px", border: "none", fontWeight: "600", cursor: "pointer", background: !mealPref ? "#dc2626" : "#e5e7eb", color: !mealPref ? "#fff" : "#374151" }}
+                        >
+                          No
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ── Notice ─────────────────────────────────────── */}
+            {othersSection === "notice" && (
+              <div style={{ maxWidth: "1000px", margin: "0 auto" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "0.875rem", marginBottom: "1.5rem" }}>
+                  <button onClick={() => { setOthersSection(null); setNoticeUnread(0); }} style={{ background: "#f3f4f6", border: "none", borderRadius: "8px", padding: "0.4rem 0.875rem", fontSize: "0.8125rem", fontWeight: "600", color: "#374151", cursor: "pointer" }}>← Back</button>
+                  <div>
+                    <h3 style={{ margin: 0 }}>Notices</h3>
+                    <p style={{ color: "var(--color-neutral-500)", fontSize: "0.875rem", marginTop: "0.125rem" }}>Announcements from your property owner and platform admins.</p>
+                  </div>
+                </div>
+                {noticeLoading ? <LoadingSpinner /> : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+                    {tenantNotices.length === 0 ? (
+                      <div className="card" style={{ textAlign: "center", padding: "3rem", color: "var(--color-neutral-400)" }}>No notices.</div>
+                    ) : tenantNotices.map(n => (
+                      <div key={n._id} className="card">
+                        <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: "0.5rem", marginBottom: "0.5rem" }}>
+                          <h4 style={{ margin: 0 }}>{n.title}</h4>
+                          <span style={{ fontSize: "0.75rem", color: "var(--color-neutral-400)" }}>{fmtDate(n.createdAt)}</span>
+                        </div>
+                        <span style={{ fontSize: "0.75rem", background: "#e0f2fe", color: "#0369a1", padding: "0.2rem 0.5rem", borderRadius: "4px" }}>
+                          {n.propertyId?.title ?? "Platform-Wide Admin Notice"}
+                        </span>
+                        <p style={{ marginTop: "1rem", color: "#374151", whiteSpace: "pre-wrap", lineHeight: "1.6" }}>{n.message}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
           </div>
         )}
 
@@ -1295,46 +1291,11 @@ export default function TenantDashboard() {
   );
 }
 
-// ── Shared styles ──────────────────────────────────────────
-const labelStyle = {
-  display: "block", fontSize: "0.8125rem", fontWeight: "600",
-  color: "#374151", marginBottom: "0.375rem",
-};
-const inputStyle = {
-  width: "100%", padding: "0.625rem 0.875rem",
-  border: "1px solid #d1d5db", borderRadius: "8px",
-  fontSize: "0.875rem", color: "#111827", background: "#ffffff",
-  outline: "none", boxSizing: "border-box",
-};
-const btnStyle = {
-  padding: "0.625rem 1.25rem", borderRadius: "8px",
-  border: "none", fontWeight: "600", fontSize: "0.875rem", cursor: "pointer",
-};
-const hubBtnStyle = {
-  background: "#ffffff", border: "1px solid #e5e7eb",
-  borderRadius: "16px", padding: "2rem 1.5rem",
-  textAlign: "center", cursor: "pointer",
-  transition: "box-shadow 0.15s, border-color 0.15s",
-  boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
-};
-const successBannerStyle = {
-  background: "#f0fdf4", border: "1px solid #86efac", borderRadius: "8px",
-  padding: "0.875rem 1.25rem", marginBottom: "1.25rem",
-  color: "#15803d", fontSize: "0.875rem", fontWeight: "500",
-};
-const errorBannerStyle = {
-  background: "#fef2f2", border: "1px solid #fca5a5", borderRadius: "8px",
-  padding: "0.75rem 1rem", marginBottom: "1rem",
-  color: "#dc2626", fontSize: "0.875rem",
-};
-const suggestionBoxStyle = {
-  position: "absolute", top: "100%", left: 0, right: 0, zIndex: 50,
-  background: "#ffffff", border: "1px solid #e5e7eb",
-  borderRadius: "8px", boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
-  marginTop: "4px", overflow: "hidden",
-};
-const suggestionItemStyle = {
-  padding: "0.625rem 0.875rem", cursor: "pointer",
-  fontSize: "0.875rem", color: "#111827",
-  borderBottom: "1px solid #f3f4f6",
-};
+const labelStyle = { display: "block", fontSize: "0.8125rem", fontWeight: "600", color: "#374151", marginBottom: "0.375rem" };
+const inputStyle = { width: "100%", padding: "0.625rem 0.875rem", border: "1px solid #d1d5db", borderRadius: "8px", fontSize: "0.875rem", color: "#111827", background: "#ffffff", outline: "none", boxSizing: "border-box" };
+const btnStyle = { padding: "0.625rem 1.25rem", borderRadius: "8px", border: "none", fontWeight: "600", fontSize: "0.875rem", cursor: "pointer" };
+const hubBtnStyle = { background: "#ffffff", border: "1px solid #e5e7eb", borderRadius: "16px", padding: "2rem 1.5rem", textAlign: "center", cursor: "pointer", transition: "box-shadow 0.15s, border-color 0.15s", boxShadow: "0 1px 3px rgba(0,0,0,0.06)" };
+const successBannerStyle = { background: "#f0fdf4", border: "1px solid #86efac", borderRadius: "8px", padding: "0.875rem 1.25rem", marginBottom: "1.25rem", color: "#15803d", fontSize: "0.875rem", fontWeight: "500" };
+const errorBannerStyle = { background: "#fef2f2", border: "1px solid #fca5a5", borderRadius: "8px", padding: "0.75rem 1rem", marginBottom: "1rem", color: "#dc2626", fontSize: "0.875rem" };
+const suggestionBoxStyle = { position: "absolute", top: "100%", left: 0, right: 0, zIndex: 50, background: "#ffffff", border: "1px solid #e5e7eb", borderRadius: "8px", boxShadow: "0 4px 12px rgba(0,0,0,0.1)", marginTop: "4px", overflow: "hidden" };
+const suggestionItemStyle = { padding: "0.625rem 0.875rem", cursor: "pointer", fontSize: "0.875rem", color: "#111827", borderBottom: "1px solid #f3f4f6" };

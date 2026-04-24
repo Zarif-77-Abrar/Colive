@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 import MaintenanceRequest from "../models/MaintenanceRequest.js";
 import Property from "../models/Property.js";
+import Room from "../models/Room.js"; // ← ADDED
 
 // ── Helper: check valid ObjectId ───────────────────────────
 const isValidId = (id) => mongoose.Types.ObjectId.isValid(id);
@@ -9,8 +10,9 @@ const isValidId = (id) => mongoose.Types.ObjectId.isValid(id);
 export const createRequest = async (req, res) => {
   const { title, description, category, propertyId, roomLabel, priority } = req.body;
 
-  if (!title || !description || !propertyId) {
-    return res.status(400).json({ message: "Title, description, and Property ID are required." });
+  // ← CHANGED: Added roomLabel validation
+  if (!title || !description || !propertyId || !roomLabel) {
+    return res.status(400).json({ message: "Title, description, Property, and Room Label are required." });
   }
 
   if (!isValidId(propertyId)) {
@@ -23,13 +25,24 @@ export const createRequest = async (req, res) => {
       return res.status(404).json({ message: "Property not found. Please check the Property ID." });
     }
 
+    // ← CHANGED: Validate that the room actually exists in this property (Case-insensitive)
+    const room = await Room.findOne({
+      propertyId,
+      label: { $regex: new RegExp(`^${roomLabel.trim()}$`, "i") }
+    });
+
+    if (!room) {
+      return res.status(400).json({ message: `Room '${roomLabel}' does not exist in the selected property. Please check the room label and try again.` });
+    }
+
     const request = await MaintenanceRequest.create({
       title,
       description,
       category:   category  || "other",
       priority:   priority  || "medium",
       propertyId,
-      roomLabel:  roomLabel?.trim() || "",
+      roomId:     room._id,     // ← Save exact room ID reference
+      roomLabel:  room.label,   // ← Save properly formatted label from DB
       createdBy:  req.user.id,
       status:     "pending",
     });
@@ -164,13 +177,11 @@ export const assignTechnician = async (req, res) => {
 };
 
 // ── PATCH /api/maintenance/:id/confirm ────────────────────
-// Tenant confirms the work is done → marks resolved
 export const confirmDone = async (req, res) => {
   try {
     const request = await MaintenanceRequest.findById(req.params.id);
     if (!request) return res.status(404).json({ message: "Request not found." });
 
-    // Only the tenant who raised the request can confirm
     if (request.createdBy.toString() !== req.user.id) {
       return res.status(403).json({ message: "Only the tenant who raised this request can confirm it." });
     }

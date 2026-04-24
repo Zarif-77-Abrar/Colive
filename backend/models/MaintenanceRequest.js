@@ -45,7 +45,7 @@ const maintenanceRequestSchema = new mongoose.Schema(
     priority: {
       type: String,
       enum: ["low", "medium", "high"],
-      default: "medium",                // ← NEW
+      default: "medium",
     },
     status: {
       type: String,
@@ -60,12 +60,12 @@ const maintenanceRequestSchema = new mongoose.Schema(
     technicianName: {
       type: String,
       trim: true,
-      default: "",                      // ← NEW (free-text technician name)
+      default: "",
     },
     roomLabel: {
       type: String,
       trim: true,
-      default: "",                      // ← NEW (free-text room label from tenant)
+      required: true, // ← CHANGED: Made mandatory
     },
     resolvedAt: {
       type: Date,
