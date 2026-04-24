@@ -1,6 +1,6 @@
 // Backend URL — falls back to port 9209 if env var is not loaded
 const _envUrl = typeof process !== "undefined" && process.env ? process.env.NEXT_PUBLIC_API_URL : null;
-const BASE_URL = (_envUrl && _envUrl !== "undefined") ? _envUrl : "http://localhost:9209/api";
+const BASE_URL = (_envUrl && _envUrl !== "undefined") ? _envUrl : "http://localhost:1494/api";
 
 const request = async (endpoint, options = {}) => {
   const token =
