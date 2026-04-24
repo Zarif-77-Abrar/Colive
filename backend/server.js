@@ -23,7 +23,6 @@ import alertRoutes          from "./routes/alertRoutes.js";
 import recommendationRoutes from "./routes/recommendationRoutes.js";
 import listingRoutes        from "./routes/listingRoutes.js";
 import messageRoutes        from "./routes/messageRoutes.js";
-import conversationRoutes   from "./routes/conversationRoutes.js";
 import auth                 from "./middleware/auth.js";
 import { registerFcmToken } from "./controllers/listingController.js";
 
