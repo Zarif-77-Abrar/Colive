@@ -31,18 +31,18 @@ dotenv.config({ override: true });
 
 const app = express();
 
-// app.use(cors({ origin: "http://localhost:3000", credentials: true }));
-app.use(cors({
-  origin: function (origin, callback) {
-    // Allow requests from localhost on any port (dev mode)
-    if (!origin || /localhost:|127\.0\.0\.1:|192\.168\./.test(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error("Not allowed by CORS"));
-    }
-  },
-  credentials: true,
-}));
+app.use(cors({ origin: "http://localhost:3000", credentials: true }));
+// app.use(cors({
+//   origin: function (origin, callback) {
+//     // Allow requests from localhost on any port (dev mode)
+//     if (!origin || /localhost:|127\.0\.0\.1:|192\.168\./.test(origin)) {
+//       callback(null, true);
+//     } else {
+//       callback(new Error("Not allowed by CORS"));
+//     }
+//   },
+//   credentials: true,
+// }));
 
 // Stripe webhook must come before express.json()
 app.post(
