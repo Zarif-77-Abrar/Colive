@@ -16,7 +16,7 @@ export const searchProperties = async (req, res) => {
     const max = maxPrice || maxRent;
     if (min) filter["rentRange.min"] = { $gte: Number(min) };
     if (max) filter["rentRange.max"] = { $lte: Number(max) };
-    if (city)    filter.city = { $regex: city, $options: "i" };
+    if (city) filter.city = { $regex: city, $options: "i" };
     if (bedrooms) filter.availableRooms = { $gte: Number(bedrooms) };
     if (furnished === "true") filter.amenities = { $regex: "furnished", $options: "i" };
 
@@ -56,10 +56,10 @@ export const searchProperties = async (req, res) => {
     if (properties.length === 0) {
       const cityLower = (city || "").toLowerCase();
       const cityDefaults = {
-        dhaka:      { lat: 23.8103, lng: 90.4125, title: "Premium Dhaka Student Studio" },
+        dhaka: { lat: 23.8103, lng: 90.4125, title: "Premium Dhaka Student Studio" },
         chittagong: { lat: 22.3569, lng: 91.7832, title: "Port City Shared Living" },
-        sylhet:     { lat: 24.8949, lng: 91.8687, title: "Green Sylhet Room-share" },
-        khulna:     { lat: 22.8456, lng: 89.5403, title: "Khulna Central Hostel" },
+        sylhet: { lat: 24.8949, lng: 91.8687, title: "Green Sylhet Room-share" },
+        khulna: { lat: 22.8456, lng: 89.5403, title: "Khulna Central Hostel" },
       };
       const cd = cityDefaults[cityLower] || { lat: 23.8103, lng: 90.4125, title: "CoLive Demo Property" };
 
@@ -167,6 +167,7 @@ export const registerFcmToken = async (req, res) => {
 
 // ── POST /api/properties (create listing + trigger notification) ──
 export const createPropertyListing = async (req, res) => {
+  console.log("Create Property Request Body:", JSON.stringify(req.body, null, 2));
   try {
     const { title, description, address, city, location, rentRange, amenities, images } = req.body;
 
@@ -181,7 +182,7 @@ export const createPropertyListing = async (req, res) => {
         const [lng, lat] = property.location.coordinates;
         const amenityData = await fetchNearbyAmenities(lat, lng);
         property.safetyRating = {
-          score:       amenityData.safetyScore,
+          score: amenityData.safetyScore,
           reviewCount: (amenityData.amenities.police?.length || 0) + (amenityData.amenities.hospital?.length || 0),
         };
         await property.save();

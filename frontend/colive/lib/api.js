@@ -76,6 +76,7 @@ export const noticeAPI = {
 // ── Messages ───────────────────────────────────────────────
 export const messageAPI = {
   send: (body) => request("/messages", { method: "POST", body: JSON.stringify(body) }),
+  getReceived: () => request("/messages/received"),
 };
 
 // ── Admin ──────────────────────────────────────────────────

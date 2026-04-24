@@ -15,6 +15,7 @@ import noticeRoutes         from "./routes/noticeRoutes.js";
 import recommendationRoutes from "./routes/recommendationRoutes.js";
 import listingRoutes        from "./routes/listingRoutes.js";
 import messageRoutes        from "./routes/messageRoutes.js";
+import conversationRoutes   from "./routes/conversationRoutes.js";
 import auth                 from "./middleware/auth.js";
 import { registerFcmToken } from "./controllers/listingController.js";
 
@@ -50,6 +51,7 @@ app.use("/api/notices",          noticeRoutes);
 app.use("/api/recommendations",  recommendationRoutes);
 app.use("/api/listing",          listingRoutes);
 app.use("/api/messages",         messageRoutes);
+app.use("/api/conversations",    conversationRoutes);
 // FCM token registration (auth protected)
 app.post("/api/auth/fcm-token",  auth, registerFcmToken);
 
