@@ -7,9 +7,19 @@ import Navbar from "../../components/Navbar";
 import { getUser, propertyAPI } from "../../lib/api";
 
 function PropertyCard({ property, onClick }) {
-  const availableRooms = property.rooms?.filter(r => r.status === "available").length || 0;
-  const minRent = Math.min(...(property.rooms?.map(r => r.rent) || [0]));
-  const maxRent = Math.max(...(property.rooms?.map(r => r.rent) || [0]));
+  const hasRooms = property.rooms && property.rooms.length > 0;
+  
+  const availableRooms = hasRooms
+    ? property.rooms.filter(r => r.status === "available").length
+    : (property.availableRooms || 0);
+
+  const minRent = hasRooms
+    ? Math.min(...property.rooms.map(r => r.rent))
+    : (property.rentRange?.min || 0);
+
+  const maxRent = hasRooms
+    ? Math.max(...property.rooms.map(r => r.rent))
+    : (property.rentRange?.max || 0);
 
   return (
     <button onClick={onClick} style={{
@@ -112,7 +122,10 @@ export default function RoomsListingPage() {
       return false;
     }
     if (filterMinRent || filterMaxRent) {
-      const minRent = Math.min(...(prop.rooms?.map(r => r.rent) || [Infinity]));
+      const minRent = prop.rooms && prop.rooms.length > 0 
+        ? Math.min(...prop.rooms.map(r => r.rent)) 
+        : (prop.rentRange?.min || Infinity);
+        
       if (filterMinRent && minRent < parseInt(filterMinRent)) return false;
       if (filterMaxRent && minRent > parseInt(filterMaxRent)) return false;
     }
