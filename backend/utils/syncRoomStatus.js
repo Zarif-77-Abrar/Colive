@@ -35,7 +35,11 @@ export const syncRoomStatus = async (roomOrId) => {
   // ── Recalculate parent property caches ───────────────────
   const allRooms = await Room.find({ propertyId: room.propertyId });
 
-  const availableRooms = allRooms.filter(r => r.status === "available").length;
+  let totalAvailableSpots = 0;
+  for (const r of allRooms) {
+    const spots = Math.max(0, r.capacity - r.currentTenants.length);
+    totalAvailableSpots += spots;
+  }
 
   const rents = allRooms.map(r => r.rent).filter(Boolean);
   const rentRange = rents.length > 0
@@ -43,7 +47,7 @@ export const syncRoomStatus = async (roomOrId) => {
     : { min: 0, max: 0 };
 
   await Property.findByIdAndUpdate(room.propertyId, {
-    availableRooms,
+    availableRooms: totalAvailableSpots,
     rentRange,
   });
 

@@ -7,7 +7,7 @@ import Navbar from "../../components/Navbar";
 import { getUser, propertyAPI } from "../../lib/api";
 
 function PropertyCard({ property, onClick }) {
-  const availableRooms = property.rooms?.filter(r => r.status === "available").length || 0;
+  const availableRooms = property.rooms?.reduce((acc, r) => acc + Math.max(0, (r.capacity || 0) - (r.currentTenants?.length || 0)), 0) || 0;
   const minRent = Math.min(...(property.rooms?.map(r => r.rent) || [0]));
   const maxRent = Math.max(...(property.rooms?.map(r => r.rent) || [0]));
 
@@ -57,7 +57,7 @@ function PropertyCard({ property, onClick }) {
           color: availableRooms > 0 ? "var(--color-success-700)" : "var(--color-neutral-500)",
           fontSize: "0.875rem", fontWeight: "600",
         }}>
-          {availableRooms} room{availableRooms !== 1 ? "s" : ""} available
+          {availableRooms} spot{availableRooms !== 1 ? "s" : ""} remaining
         </div>
       </div>
 

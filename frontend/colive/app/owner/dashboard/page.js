@@ -199,7 +199,7 @@ export default function OwnerDashboard() {
             <p style={{ color: "var(--color-neutral-500)", marginBottom: "2rem", fontSize: "0.9375rem" }}>Manage your properties, tenants, and bookings.</p>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "1rem", marginBottom: "2rem" }}>
               <StatCard label="Total properties" value={properties.data?.count ?? "—"} sub={`${totalRooms} rooms total`} accent="primary" />
-              <StatCard label="Available rooms"  value={availableRooms}               sub="across all properties"       accent="success" />
+              <StatCard label="Remaining spots"  value={availableRooms}               sub="across all properties"       accent="success" />
               <StatCard label="Pending bookings" value={pendingBookings}              sub="awaiting your response"       accent="warning" />
               <StatCard label="Open maintenance" value={openMaintenance}              sub="unresolved requests"          accent="error"   />
             </div>
