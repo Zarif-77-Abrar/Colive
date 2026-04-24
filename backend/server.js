@@ -20,13 +20,30 @@ import utilityBillRoutes    from "./routes/utilityBillRoutes.js";
 import agreementRoutes      from "./routes/agreementRoutes.js";
 import { stripeWebhook }    from "./controllers/paymentController.js";
 import alertRoutes          from "./routes/alertRoutes.js";
+import recommendationRoutes from "./routes/recommendationRoutes.js";
+import listingRoutes        from "./routes/listingRoutes.js";
+import messageRoutes        from "./routes/messageRoutes.js";
+import conversationRoutes   from "./routes/conversationRoutes.js";
+import auth                 from "./middleware/auth.js";
+import { registerFcmToken } from "./controllers/listingController.js";
 
 dns.setServers(["1.1.1.1", "8.8.8.8"]);
 dotenv.config({ override: true });
 
 const app = express();
 
-app.use(cors({ origin: "http://localhost:3000", credentials: true }));
+// app.use(cors({ origin: "http://localhost:3000", credentials: true }));
+app.use(cors({
+  origin: function (origin, callback) {
+    // Allow requests from localhost on any port (dev mode)
+    if (!origin || /localhost:|127\.0\.0\.1:|192\.168\./.test(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error("Not allowed by CORS"));
+    }
+  },
+  credentials: true,
+}));
 
 // Stripe webhook must come before express.json()
 app.post(
@@ -34,7 +51,6 @@ app.post(
   express.raw({ type: "application/json" }),
   stripeWebhook
 );
-
 app.use(express.json());
 
 connectDB();
@@ -55,6 +71,12 @@ app.use("/api/conversations", conversationRoutes);
 app.use("/api/bills",         utilityBillRoutes);
 app.use("/api/agreements",    agreementRoutes);
 app.use("/api/alerts",        alertRoutes);
+app.use("/api/recommendations",  recommendationRoutes);
+app.use("/api/listing",          listingRoutes);
+app.use("/api/messages",         messageRoutes);
+app.use("/api/conversations",    conversationRoutes);
+// FCM token registration (auth protected)
+app.post("/api/auth/fcm-token",  auth, registerFcmToken);
 
 app.get("/api/health", (req, res) => res.json({ status: "CoLive API running" }));
 

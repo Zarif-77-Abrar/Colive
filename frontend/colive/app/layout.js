@@ -1,7 +1,8 @@
 import { Inter } from "next/font/google";
 import "./globals.css";
-// import FCMProvider from "../components/FCMProvider";
 
+
+import { NotificationProvider } from "../lib/NotificationContext";
 
 const inter = Inter({
   subsets:  ["latin"],
@@ -17,8 +18,9 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en">
       <body className={inter.className} suppressHydrationWarning>
-        {/* <FCMProvider /> */}
-        {children}
+        <NotificationProvider>
+          {children}
+        </NotificationProvider>
       </body>
     </html>
   );

@@ -73,6 +73,14 @@ export default function OwnerDashboard() {
   const [mealStats, setMealStats] = useState({ yes: [], no: [] });
   const [mealLoading, setMealLoading] = useState(false);
 
+  // Add Property Modal State
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [adding, setAdding] = useState(false);
+  const [addError, setAddError] = useState("");
+  const [newProp, setNewProp] = useState({
+    title: "", address: "", city: "", postalCode: "", description: "", propertyType: "apartment", minRent: "", maxRent: "", amenities: ""
+  });
+
   useEffect(() => {
     const u = getUser();
     if (!u) { router.push("/login"); return; }
@@ -173,6 +181,23 @@ export default function OwnerDashboard() {
     } catch (e) { setMActionError(e.message); } finally { setMActionLoading(false); }
   };
 
+  const handleAddProperty = async (e) => {
+    e.preventDefault();
+    setAddError("");
+    setAdding(true);
+    try {
+      const payload = { ...newProp, rentRange: { min: Number(newProp.minRent), max: Number(newProp.maxRent) }, amenities: newProp.amenities.split(",").map(a => a.trim()).filter(a => a) };
+      await propertyAPI.create(payload);
+      setShowAddModal(false);
+      setNewProp({ title: "", address: "", city: "", postalCode: "", description: "", propertyType: "apartment", minRent: "", maxRent: "", amenities: "" });
+      properties.mutate(); // refresh properties list
+    } catch (err) {
+      setAddError(err.message || "Failed to create property");
+    } finally {
+      setAdding(false);
+    }
+  };
+
   if (!user) return null;
 
   const totalRooms      = properties.data?.properties?.reduce((s, p) => s + (p.rooms?.length ?? 0), 0) ?? 0;
@@ -231,13 +256,13 @@ export default function OwnerDashboard() {
           <div>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem" }}>
               <h3>My properties</h3>
-              <button className="btn btn-primary btn-sm">+ Add property</button>
+              <button className="btn btn-primary btn-sm" onClick={() => setShowAddModal(true)}>+ Add property</button>
             </div>
             {properties.loading ? <LoadingSpinner /> : properties.error ? <ErrorState message={properties.error} /> :
               properties.data?.properties?.length === 0 ? (
                 <div className="card" style={{ textAlign: "center", padding: "3rem" }}>
                   <p style={{ color: "var(--color-neutral-500)", marginBottom: "1rem" }}>You have not listed any properties yet.</p>
-                  <button className="btn btn-primary">+ Add your first property</button>
+                  <button className="btn btn-primary" onClick={() => setShowAddModal(true)}>+ Add your first property</button>
                 </div>
               ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
@@ -592,6 +617,73 @@ export default function OwnerDashboard() {
         )}
 
       </div>
+
+      {/* ── Add Property Modal ──────────────────────────────── */}
+      {showAddModal && (
+        <div style={{
+          position: "fixed", top: 0, left: 0, width: "100%", height: "100%",
+          background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: "1rem"
+        }}>
+          <div className="card" style={{ width: "100%", maxWidth: "500px", maxHeight: "90vh", overflowY: "auto" }}>
+            <h3 style={{ marginBottom: "1.5rem" }}>Add New Property</h3>
+            {addError && <div style={{ color: "red", marginBottom: "1rem" }}>{addError}</div>}
+            <form onSubmit={handleAddProperty} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+              <div>
+                <label className="input-label">Title</label>
+                <input required className="input" value={newProp.title} onChange={e => setNewProp({...newProp, title: e.target.value})} placeholder="e.g. Sunny Apartment in Downtown" />
+              </div>
+              <div>
+                <label className="input-label">Address</label>
+                <input required className="input" value={newProp.address} onChange={e => setNewProp({...newProp, address: e.target.value})} placeholder="e.g. 123 Main St" />
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
+                <div>
+                  <label className="input-label">City</label>
+                  <input required className="input" value={newProp.city} onChange={e => setNewProp({...newProp, city: e.target.value})} placeholder="e.g. Dhaka" />
+                </div>
+                <div>
+                  <label className="input-label">Postal Code</label>
+                  <input required className="input" value={newProp.postalCode} onChange={e => setNewProp({...newProp, postalCode: e.target.value})} placeholder="e.g. 1000" />
+                </div>
+              </div>
+              <div>
+                <label className="input-label">Property Type</label>
+                <select className="input" value={newProp.propertyType} onChange={e => setNewProp({...newProp, propertyType: e.target.value})}>
+                  <option value="apartment">Apartment</option>
+                  <option value="house">House</option>
+                  <option value="pg">PG</option>
+                </select>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
+                <div>
+                  <label className="input-label">Min Rent (BDT)</label>
+                  <input required type="number" className="input" value={newProp.minRent} onChange={e => setNewProp({...newProp, minRent: e.target.value})} placeholder="e.g. 10000" />
+                </div>
+                <div>
+                  <label className="input-label">Max Rent (BDT)</label>
+                  <input required type="number" className="input" value={newProp.maxRent} onChange={e => setNewProp({...newProp, maxRent: e.target.value})} placeholder="e.g. 25000" />
+                </div>
+              </div>
+              <div>
+                <label className="input-label">Amenities (comma separated)</label>
+                <input className="input" value={newProp.amenities} onChange={e => setNewProp({...newProp, amenities: e.target.value})} placeholder="e.g. WiFi, Gym, Pool" />
+              </div>
+              <div>
+                <label className="input-label">Description</label>
+                <textarea required className="input" rows="3" value={newProp.description} onChange={e => setNewProp({...newProp, description: e.target.value})} placeholder="Write a brief description..." />
+              </div>
+              
+              <div style={{ display: "flex", gap: "1rem", marginTop: "1rem" }}>
+                <button type="button" className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setShowAddModal(false)}>Cancel</button>
+                <button type="submit" className="btn btn-primary" style={{ flex: 1 }} disabled={adding}>
+                  {adding ? "Saving..." : "Add Property"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

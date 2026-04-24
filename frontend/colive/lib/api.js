@@ -1,4 +1,6 @@
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL;
+// Backend URL — falls back to port 9209 if env var is not loaded
+const _envUrl = typeof process !== "undefined" && process.env ? process.env.NEXT_PUBLIC_API_URL : null;
+const BASE_URL = (_envUrl && _envUrl !== "undefined") ? _envUrl : "http://localhost:9209/api";
 
 const request = async (endpoint, options = {}) => {
   const token =
@@ -30,6 +32,7 @@ export const authAPI = {
   register: (body) => request("/auth/register", { method: "POST", body: JSON.stringify(body) }),
   login:    (body) => request("/auth/login",    { method: "POST", body: JSON.stringify(body) }),
   getMe:    ()     => request("/auth/me"),
+  saveFcmToken: (token) => request("/auth/fcm-token", { method: "POST", body: JSON.stringify({ token }) }),
 };
 
 export const userAPI = {
@@ -44,6 +47,14 @@ export const propertyAPI = {
   getAll:  (query = "") => request(`/properties${query}`),
   getById: (id)         => request(`/properties/${id}`),
   getMy:   ()           => request("/properties/my"),
+  // ── My feature endpoints ──
+  advSearch:    (query = "") => request(`/listing/adv-search${query}`),
+  recommend:    (body)       => request("/recommendations", { method: "POST", body: JSON.stringify(body) }),
+  getAmenities: (id)         => request(`/listing/${id}/amenities`),
+  searchNearby: (lat, lng, radius = 2000, keyword = "") =>
+    request(`/listing/nearby?lat=${lat}&lng=${lng}&radius=${radius}&keyword=${encodeURIComponent(keyword)}`),
+  create: (body) => request("/listing", { method: "POST", body: JSON.stringify(body) }),
+  getDetail: (id) => request(`/listing/${id}`),
 };
 
 export const bookingAPI = {
@@ -140,6 +151,13 @@ export const alertAPI = {
   sendEmergency: (tenantId) => request(`/alerts/emergency/${tenantId}`, { method: "POST" }),
 };
 
+// ── Messages ───────────────────────────────────────────────
+export const messageAPI = {
+  send: (body) => request("/messages", { method: "POST", body: JSON.stringify(body) }),
+  getReceived: () => request("/messages/received"),
+};
+
+// ── Admin ──────────────────────────────────────────────────
 export const adminAPI = {
   getStats:       () => request("/admin/stats"),
   getUsers:       () => request("/admin/users"),
