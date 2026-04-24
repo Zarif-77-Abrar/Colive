@@ -1,8 +1,8 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import Navbar from "../../../../components/Navbar";
-import { getUser, maintenanceAPI } from "../../../../lib/api";
+import Navbar from "../../../components/Navbar";
+import { getUser, maintenanceAPI } from "../../../lib/api";
 
 const STATUS_META = {
   pending:     { label: "Pending",     color: "#b45309", bg: "#fef3c7" },
