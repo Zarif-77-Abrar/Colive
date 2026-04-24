@@ -3,7 +3,6 @@ import jwt from "jsonwebtoken";
 import { validationResult } from "express-validator";
 import User from "../models/User.js";
 
-// ── Helper: generate JWT ───────────────────────────────────
 const generateToken = (user) => {
   return jwt.sign(
     { id: user._id, role: user.role },
@@ -12,7 +11,6 @@ const generateToken = (user) => {
   );
 };
 
-// ── Helper: send validation errors ────────────────────────
 const handleValidationErrors = (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
@@ -29,30 +27,22 @@ export const register = async (req, res) => {
   const { name, email, password, role, gender, university, phone } = req.body;
 
   try {
-    // Check if email already exists
     const existing = await User.findOne({ email });
     if (existing) {
       return res.status(409).json({ message: "An account with this email already exists." });
     }
 
-    // Prevent registering as admin through the public API
     if (role === "admin") {
       return res.status(403).json({ message: "Admin accounts cannot be created through registration." });
     }
 
-    // Hash password
-    const salt = await bcrypt.genSalt(12);
+    const salt         = await bcrypt.genSalt(12);
     const passwordHash = await bcrypt.hash(password, salt);
 
-    // Create user
     const user = await User.create({
-      name,
-      email,
-      passwordHash,
+      name, email, passwordHash,
       role: role || "tenant",
-      gender,
-      university,
-      phone,
+      gender, university, phone,
     });
 
     const token = generateToken(user);
@@ -82,20 +72,25 @@ export const login = async (req, res) => {
   const { email, password } = req.body;
 
   try {
-    // Find user — include passwordHash (excluded by default via select)
     const user = await User.findOne({ email }).select("+passwordHash");
     if (!user) {
-      // Intentionally vague — don't reveal whether email exists
       return res.status(401).json({ message: "Invalid email or password." });
     }
 
-    // Verify password
     const isMatch = await bcrypt.compare(password, user.passwordHash);
     if (!isMatch) {
       return res.status(401).json({ message: "Invalid email or password." });
     }
 
-    // Update FCM token if provided
+    // ── Blacklist check at login ───────────────────────────
+    if (user.isBlacklisted) {
+      return res.status(403).json({
+        code:    "BLACKLISTED",
+        message: "Your account has been suspended.",
+        reason:  user.blacklistReason || "Please contact support for more information.",
+      });
+    }
+
     if (req.body.fcmToken && !user.fcmTokens.includes(req.body.fcmToken)) {
       user.fcmTokens.push(req.body.fcmToken);
       await user.save();
@@ -121,14 +116,10 @@ export const login = async (req, res) => {
 };
 
 // ── GET /api/auth/me ───────────────────────────────────────
-// Returns the currently logged-in user's profile.
-// Protected — requires auth middleware.
 export const getMe = async (req, res) => {
   try {
     const user = await User.findById(req.user.id).select("-passwordHash");
-    if (!user) {
-      return res.status(404).json({ message: "User not found." });
-    }
+    if (!user) return res.status(404).json({ message: "User not found." });
     return res.status(200).json({ user });
   } catch (err) {
     console.error("GetMe error:", err.message);

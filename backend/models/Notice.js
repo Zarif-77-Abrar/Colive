@@ -10,7 +10,7 @@ const noticeSchema = new mongoose.Schema(
     propertyId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Property",
-      required: true,
+      default: null,   // null = platform-wide admin notice
     },
     title: {
       type: String,
@@ -22,6 +22,16 @@ const noticeSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
+    isGlobal: {
+      type: Boolean,
+      default: false,  // true = admin posted to all users
+    },
+    readBy: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+    ],
   },
   { timestamps: true }
 );

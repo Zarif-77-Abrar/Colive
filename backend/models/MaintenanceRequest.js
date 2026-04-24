@@ -10,7 +10,7 @@ const maintenanceRequestSchema = new mongoose.Schema(
     roomId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Room",
-      default: null, // null = property-wide issue
+      default: null,
     },
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
@@ -42,6 +42,11 @@ const maintenanceRequestSchema = new mongoose.Schema(
       ],
       required: true,
     },
+    priority: {
+      type: String,
+      enum: ["low", "medium", "high"],
+      default: "medium",
+    },
     status: {
       type: String,
       enum: ["pending", "in_progress", "resolved"],
@@ -50,6 +55,28 @@ const maintenanceRequestSchema = new mongoose.Schema(
     assignedTo: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
+      default: null,
+    },
+    technicianName: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    roomLabel: {
+      type: String,
+      trim: true,
+      required: true, // ← CHANGED: Made mandatory
+    },
+    resolvedAt: {
+      type: Date,
+      default: null,
+    },
+    tenantConfirmed: {
+      type: Boolean,
+      default: false,
+    },
+    tenantConfirmedAt: {
+      type: Date,
       default: null,
     },
   },

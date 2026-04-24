@@ -1,14 +1,19 @@
 import express from "express";
 import auth from "../middleware/auth.js";
 import { requireRole } from "../middleware/auth.js";
+import checkBlacklist from "../middleware/checkBlacklist.js";
 import {
-  getMyBookings,
-  getReceivedBookings,
+  getMyBookings, getReceivedBookings,
+  createBooking, acceptBooking, rejectBooking, leaveBooking,
 } from "../controllers/bookingController.js";
 
 const router = express.Router();
 
-router.get("/my",       auth, requireRole("tenant"), getMyBookings);
-router.get("/received", auth, requireRole("owner"),  getReceivedBookings);
+router.get("/my",           auth, requireRole("tenant"),              getMyBookings);
+router.get("/received",     auth, requireRole("owner"),               getReceivedBookings);
+router.post("/",            auth, requireRole("tenant"), checkBlacklist, createBooking);
+router.put("/:id/accept",   auth, requireRole("owner"),               acceptBooking);
+router.put("/:id/reject",   auth, requireRole("owner"),               rejectBooking);
+router.put("/:id/leave",    auth, requireRole("tenant"),              leaveBooking);
 
 export default router;
