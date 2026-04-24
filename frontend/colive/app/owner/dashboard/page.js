@@ -9,7 +9,7 @@ import StatCard from "../../../components/StatCard";
 import DataTable from "../../../components/DataTable";
 import { LoadingSpinner, ErrorState } from "../../../components/LoadingState";
 import useApi from "../../../lib/useApi";
-import { getUser, propertyAPI, bookingAPI, maintenanceAPI, noticeAPI, guestLogAPI, mealAPI } from "../../../lib/api";
+import { getUser, propertyAPI, bookingAPI, maintenanceAPI, noticeAPI, guestLogAPI, mealAPI, utilityBillAPI } from "../../../lib/api";
 
 const TABS = [
   { key: "overview",    label: "Overview"       },
@@ -73,6 +73,12 @@ export default function OwnerDashboard() {
   const [mealStats, setMealStats] = useState({ yes: [], no: [] });
   const [mealLoading, setMealLoading] = useState(false);
 
+  // ── Utility Bills State ────────────────────────────────
+  const [utilityForm, setUtilityForm] = useState({ propertyId: "", month: new Date().toISOString().slice(0, 7), electricity: "", water: "", gas: "", internet: "" });
+  const [utilityPosting, setUtilityPosting] = useState(false);
+  const [utilityPostError, setUtilityPostError] = useState("");
+  const [utilityPostSuccess, setUtilityPostSuccess] = useState("");
+
   // Add Property Modal State
   const [showAddModal, setShowAddModal] = useState(false);
   const [adding, setAdding] = useState(false);
@@ -91,6 +97,7 @@ export default function OwnerDashboard() {
   const properties = useApi(propertyAPI.getMy);
   const bookings   = useApi(bookingAPI.getReceived);
   const notices    = useApi(noticeAPI.getMy);
+  const utilityBills = useApi(utilityBillAPI.getProperty);
 
   const fetchMaintenance = useCallback(async () => {
     setMLoading(true); setMError("");
@@ -134,6 +141,26 @@ export default function OwnerDashboard() {
   }, [mealPropFilter]);
 
   // ── Handlers ─────────────────────────────────────────────
+  const handleUtilitySubmit = async (e) => {
+    e.preventDefault();
+    if (!utilityForm.propertyId || !utilityForm.month) return setUtilityPostError("Property and month are required.");
+    setUtilityPosting(true); setUtilityPostError(""); setUtilityPostSuccess("");
+    try {
+      await utilityBillAPI.createOrUpdate({
+        ...utilityForm, 
+        electricity: Number(utilityForm.electricity) || 0,
+        water: Number(utilityForm.water) || 0,
+        gas: Number(utilityForm.gas) || 0,
+        internet: Number(utilityForm.internet) || 0,
+      });
+      setUtilityPostSuccess("Utility bill posted successfully!");
+      setUtilityForm({ propertyId: "", month: utilityForm.month, electricity: "", water: "", gas: "", internet: "" });
+      utilityBills.refetch?.();
+      setTimeout(() => setUtilityPostSuccess(""), 3000);
+    } catch (err) { setUtilityPostError(err.message || "Failed to post bill."); }
+    finally { setUtilityPosting(false); }
+  };
+
   const handleNoticeSubmit = async (e) => {
     e.preventDefault();
     if (!noticeForm.title.trim() || !noticeForm.message.trim() || !noticeForm.propertyId) {
@@ -448,6 +475,11 @@ export default function OwnerDashboard() {
                     <div style={{ fontWeight: "700", fontSize: "1rem", color: "#111827", marginBottom: "0.375rem" }}>Guest Entry Log</div>
                     <div style={{ fontSize: "0.8125rem", color: "#6b7280", lineHeight: "1.5" }}>Review and approve guest visits for your properties.</div>
                   </button>
+                  <button onClick={() => setOthersSection("utility")} style={hubBtnStyle}>
+                    <div style={{ fontSize: "2rem", marginBottom: "0.75rem" }}>⚡</div>
+                    <div style={{ fontWeight: "700", fontSize: "1rem", color: "#111827", marginBottom: "0.375rem" }}>Utility Bills</div>
+                    <div style={{ fontSize: "0.8125rem", color: "#6b7280", lineHeight: "1.5" }}>Manage utility bills for your properties.</div>
+                  </button>
                   <button onClick={() => setOthersSection("meal")} style={hubBtnStyle}>
                     <div style={{ fontSize: "2rem", marginBottom: "0.75rem" }}>🍽️</div>
                     <div style={{ fontWeight: "700", fontSize: "1rem", color: "#111827", marginBottom: "0.375rem" }}>Daily Meal</div>
@@ -610,6 +642,94 @@ export default function OwnerDashboard() {
                       </button>
                     </div>
                   </form>
+                </div>
+              </div>
+            )}
+
+            {/* Utility Bills */}
+            {othersSection === "utility" && (
+              <div style={{ maxWidth: "800px", margin: "0 auto" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "0.875rem", marginBottom: "1.5rem" }}>
+                  <button onClick={() => setOthersSection(null)} style={backBtnStyle}>← Back</button>
+                  <div>
+                    <h3 style={{ margin: 0 }}>Utility Bills</h3>
+                    <p style={{ color: "var(--color-neutral-500)", fontSize: "0.875rem", marginTop: "0.125rem" }}>Record and track utility bills for your properties.</p>
+                  </div>
+                </div>
+
+                <div className="card" style={{ marginBottom: "2rem" }}>
+                  <h4 style={{ marginBottom: "1rem" }}>Post New Utility Bill</h4>
+                  {utilityPostError && <div style={errorBannerStyle}>{utilityPostError}</div>}
+                  {utilityPostSuccess && <div style={successBannerStyle}>✓ {utilityPostSuccess}</div>}
+                  <form onSubmit={handleUtilitySubmit}>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "1rem" }}>
+                      <div>
+                        <label style={panelLabelStyle}>Property *</label>
+                        <select value={utilityForm.propertyId} onChange={e => setUtilityForm({ ...utilityForm, propertyId: e.target.value })} style={selectStyle} required>
+                          <option value="">Select a property...</option>
+                          {(properties.data?.properties ?? []).map(p => (
+                            <option key={p._id} value={p._id}>{p.title}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label style={panelLabelStyle}>Billing Month *</label>
+                        <input type="month" value={utilityForm.month} onChange={e => setUtilityForm({ ...utilityForm, month: e.target.value })} style={selectStyle} required />
+                      </div>
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: "1rem", marginBottom: "1.5rem" }}>
+                      <div>
+                        <label style={panelLabelStyle}>Electricity</label>
+                        <input type="number" placeholder="BDT" value={utilityForm.electricity} onChange={e => setUtilityForm({ ...utilityForm, electricity: e.target.value })} style={selectStyle} min="0" />
+                      </div>
+                      <div>
+                        <label style={panelLabelStyle}>Water</label>
+                        <input type="number" placeholder="BDT" value={utilityForm.water} onChange={e => setUtilityForm({ ...utilityForm, water: e.target.value })} style={selectStyle} min="0" />
+                      </div>
+                      <div>
+                        <label style={panelLabelStyle}>Gas</label>
+                        <input type="number" placeholder="BDT" value={utilityForm.gas} onChange={e => setUtilityForm({ ...utilityForm, gas: e.target.value })} style={selectStyle} min="0" />
+                      </div>
+                      <div>
+                        <label style={panelLabelStyle}>Internet/Other</label>
+                        <input type="number" placeholder="BDT" value={utilityForm.internet} onChange={e => setUtilityForm({ ...utilityForm, internet: e.target.value })} style={selectStyle} min="0" />
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                      <button type="submit" disabled={utilityPosting} style={{ ...saveBtnStyle, opacity: utilityPosting ? 0.6 : 1 }}>
+                        {utilityPosting ? "Posting..." : "Post Bill"}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+
+                <div className="card">
+                  <h4 style={{ marginBottom: "1rem" }}>Previous Bills</h4>
+                  {utilityBills.loading ? <LoadingSpinner /> : utilityBills.error ? <ErrorState message={utilityBills.error} /> : 
+                    utilityBills.data?.bills?.length === 0 ? (
+                      <div style={{ textAlign: "center", padding: "2rem", color: "var(--color-neutral-400)" }}>No utility bills recorded yet.</div>
+                    ) : (
+                      <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+                        {(utilityBills.data?.bills ?? []).map(b => (
+                          <div key={b._id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "1rem", border: "1px solid var(--color-neutral-200)", borderRadius: "var(--radius-md)" }}>
+                            <div>
+                              <p style={{ fontWeight: "600", marginBottom: "0.25rem" }}>{b.propertyId?.title ?? "—"} ({b.month})</p>
+                              <div style={{ display: "flex", gap: "1rem", fontSize: "0.8125rem", color: "var(--color-neutral-500)", flexWrap: "wrap" }}>
+                                <span>⚡ BDT {b.electricity}</span>
+                                <span>💧 BDT {b.water}</span>
+                                <span>🔥 BDT {b.gas}</span>
+                                <span>🌐 BDT {b.internet}</span>
+                              </div>
+                            </div>
+                            <div style={{ textAlign: "right" }}>
+                              <p style={{ fontSize: "0.75rem", color: "var(--color-neutral-400)", marginBottom: "0.25rem" }}>TOTAL AMOUNT</p>
+                              <p style={{ fontWeight: "700", color: "var(--color-neutral-900)" }}>BDT {b.total?.toLocaleString()}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )
+                  }
                 </div>
               </div>
             )}

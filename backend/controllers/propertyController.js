@@ -34,7 +34,14 @@ export const getAllProperties = async (req, res) => {
       .populate("ownerId", "name phone email")
       .sort({ createdAt: -1 });
 
-    return res.status(200).json({ count: properties.length, properties });
+    const result = await Promise.all(
+      properties.map(async (p) => {
+        const rooms = await Room.find({ propertyId: p._id });
+        return { ...p.toObject(), rooms };
+      })
+    );
+
+    return res.status(200).json({ count: result.length, properties: result });
   } catch (err) {
     console.error("getAllProperties error:", err.message);
     return res.status(500).json({ message: "Server error." });
