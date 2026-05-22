@@ -109,6 +109,8 @@ export const sendMessage = async (req, res) => {
     );
     const tokens = recipients.flatMap(p => p.fcmTokens ?? []);
 
+    console.log(`FCM: Sending to ${recipients.length} recipient(s), ${tokens.length} token(s)`);
+
     if (tokens.length > 0) {
       await sendNotification({
         tokens,

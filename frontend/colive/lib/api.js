@@ -13,8 +13,24 @@ const request = async (endpoint, options = {}) => {
     ...options,
   };
 
-  const res = await fetch(`${BASE_URL}${endpoint}`, config);
-  const data = await res.json();
+  let res;
+  try {
+    res = await fetch(`${BASE_URL}${endpoint}`, config);
+  } catch (networkErr) {
+    const err = new Error("Network error — unable to reach the server.");
+    err.code = "NETWORK_ERROR";
+    err.reason = networkErr.message;
+    throw err;
+  }
+
+  let data;
+  try {
+    data = await res.json();
+  } catch {
+    const err = new Error("Invalid response from server.");
+    err.code = "PARSE_ERROR";
+    throw err;
+  }
 
   if (!res.ok) {
     const err = new Error(data.message || data.errors?.[0]?.msg || "Something went wrong.");

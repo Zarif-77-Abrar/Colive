@@ -30,7 +30,8 @@ export default function MessageThread({ messages, currentUserId, isLoading }) {
       padding: "1rem", overflowY: "auto", flexGrow: 1,
     }}>
       {messages.map((msg) => {
-        const isSent = msg.senderId._id === currentUserId;
+        const senderId = msg.senderId?._id ?? msg.senderId;
+        const isSent = senderId === currentUserId;
 
         return (
           <div
@@ -49,7 +50,7 @@ export default function MessageThread({ messages, currentUserId, isLoading }) {
                 fontSize: "0.8125rem", fontWeight: "700",
                 color: "var(--color-primary-700)", flexShrink: 0,
               }}>
-                {msg.senderId.name?.charAt(0).toUpperCase()}
+                {msg.senderId?.name?.charAt(0).toUpperCase() || "?"}
               </div>
             )}
 
@@ -65,7 +66,7 @@ export default function MessageThread({ messages, currentUserId, isLoading }) {
                   color: "var(--color-neutral-500)",
                   paddingLeft: "0.5rem",
                 }}>
-                  {msg.senderId.name}
+                  {msg.senderId?.name || "Unknown"}
                 </p>
               )}
 

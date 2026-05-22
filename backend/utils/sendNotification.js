@@ -1,6 +1,7 @@
 import admin from "firebase-admin";
 import { readFileSync } from "fs";
 import 'dotenv/config';
+import User from "../models/User.js";
 
 // ── Initialize Firebase Admin ──────────────────────────────
 // Set FIREBASE_SERVICE_ACCOUNT_PATH in your .env
@@ -66,11 +67,28 @@ export const sendNotification = async ({ tokens, title, body, data = {} }) => {
   try {
     const response = await admin.messaging().sendEachForMulticast(message);
     console.log(`FCM: ${response.successCount} sent, ${response.failureCount} failed`);
+
+    // Clean up invalid tokens
+    const staleTokens = [];
     response.responses.forEach((r, i) => {
       if (!r.success) {
+        const code = r.error?.code;
+        if (code === "messaging/registration-token-not-registered" ||
+            code === "messaging/invalid-registration-token") {
+          staleTokens.push(validTokens[i]);
+        }
         console.error(`FCM token ${i} failed:`, r.error?.message);
       }
     });
+
+    // Remove stale tokens from all users who have them
+    if (staleTokens.length > 0) {
+      await User.updateMany(
+        { fcmTokens: { $in: staleTokens } },
+        { $pullAll: { fcmTokens: staleTokens } }
+      );
+      console.log(`FCM: Removed ${staleTokens.length} stale token(s)`);
+    }
   } catch (err) {
     console.error("sendNotification error:", err.message);
   }

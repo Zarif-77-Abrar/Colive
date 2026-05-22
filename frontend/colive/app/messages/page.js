@@ -83,26 +83,41 @@ export default function MessagesPage() {
   useEffect(() => {
     if (!selectedConversationId) return;
 
-    const startPolling = async () => {
-      pollingRef.current = setInterval(async () => {
-        // Stop polling if token is gone (user logged out)
-        const token = localStorage.getItem("token");
-        if (!token) {
-          clearInterval(pollingRef.current);
-          return;
-        }
-        try {
-          const data = await conversationAPI.getById(selectedConversationId);
+    let abortController = new AbortController();
+    let failCount = 0;
+    const MAX_FAILURES = 5;
+
+    pollingRef.current = setInterval(async () => {
+      // Stop polling if token is gone (user logged out)
+      const token = localStorage.getItem("token");
+      if (!token) {
+        clearInterval(pollingRef.current);
+        return;
+      }
+
+      // Stop polling after too many consecutive failures
+      if (failCount >= MAX_FAILURES) {
+        clearInterval(pollingRef.current);
+        console.warn("Polling stopped after repeated failures. Reload to retry.");
+        return;
+      }
+
+      try {
+        const data = await conversationAPI.getById(selectedConversationId);
+        if (!abortController.signal.aborted) {
           setMessages(data.messages || []);
-        } catch (err) {
+          failCount = 0; // reset on success
+        }
+      } catch (err) {
+        if (!abortController.signal.aborted) {
+          failCount++;
           console.error("Polling error:", err);
         }
-      }, POLLING_INTERVAL);
-    };
-
-    startPolling();
+      }
+    }, POLLING_INTERVAL);
 
     return () => {
+      abortController.abort();
       if (pollingRef.current) clearInterval(pollingRef.current);
     };
   }, [selectedConversationId]);

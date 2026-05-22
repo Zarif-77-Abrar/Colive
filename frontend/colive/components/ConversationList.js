@@ -26,9 +26,10 @@ export default function ConversationList({
   // Get last message preview
   const getLastMessagePreview = (conv) => {
     if (!conv.lastMessage) return "No messages yet";
-    const isFromMe = conv.lastMessage.senderId._id === currentUserId;
+    const senderId = conv.lastMessage.senderId?._id ?? conv.lastMessage.senderId;
+    const isFromMe = senderId === currentUserId;
     const prefix = isFromMe ? "You: " : "";
-    return prefix + conv.lastMessage.content.substring(0, 40);
+    return prefix + (conv.lastMessage.content || "").substring(0, 40);
   };
 
   return (

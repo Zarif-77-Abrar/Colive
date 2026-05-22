@@ -1,6 +1,6 @@
 import { Inter } from "next/font/google";
 import "./globals.css";
-// import FCMProvider from "../components/FCMProvider";
+import FCMProvider from "../components/FCMProvider";
 
 
 const inter = Inter({
@@ -17,7 +17,7 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en">
       <body className={inter.className} suppressHydrationWarning>
-        {/* <FCMProvider /> */}
+        <FCMProvider />
         {children}
       </body>
     </html>

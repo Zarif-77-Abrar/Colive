@@ -2,8 +2,8 @@
 // This file MUST be at /public/firebase-messaging-sw.js
 // so the browser can register it at the root scope.
 
-importScripts("https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js");
-importScripts("https://www.gstatic.com/firebasejs/10.7.0/firebase-messaging-compat.js");
+importScripts("https://www.gstatic.com/firebasejs/11.8.1/firebase-app-compat.js");
+importScripts("https://www.gstatic.com/firebasejs/11.8.1/firebase-messaging-compat.js");
 
 firebase.initializeApp({
   apiKey:            "AIzaSyDs5vde_2ZM9uXfpsn5yc95vYf9TD-b954",
